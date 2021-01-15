@@ -15,7 +15,7 @@
 !!bk reload 重载插件配置
 !!bk add <name> <kikai> 使用当前玩家参数添加一个名为<name>用于<kikai>的假人
 !!bk add <name> <kikai> <dim> <pos> <facing> 使用自定义参数添加一个名为<name>用于<kikai>的假人
-!!bk del <kikai> 从机器人列表移除用于<kikai>的假人
+!!bk del <kikai> 从假人列表移除用于<kikai>的假人
 !!bk <kikai> 输出一个可点击的界面，自动根据假人是否在线改变选项
 !!bk <kikai> spawn 召唤一个用于<kikai>的假人
 !!bk <kikai> kill 干掉用于<kikai>的假人
@@ -47,6 +47,7 @@
   ```
 * `!!bk reload`: 重载[BotKikai.json](https://github.com/Jerry-FaGe/MCDR-BotKikai/blob/master/BotKikai.json)配置文件，用于用户修改配置。配置文件详见下文 **关于配置文件**。
 * `!!bk add <name> <kikai>`: 使用玩家当前的维度，坐标，朝向添加一个假人。也就是说如果玩家用准星指着开关使用此指令后，召唤出的假人可以直接use开关。
+    **注:** 由于carpet本身原因，假人无法use拉杆，如果机器的开关是拉杆形式的请自行替换成音符盒式或其他支持假人use的方式。
 * `!!bk add <name> <kikai> <dim> <pos> <facing>`: 使用指令中的自定义参数添加一个假人，可用作挂机点等对假人朝向没有要求的场景。
 * `!!bk del <kikai>`: 没啥好说的，从列表删掉这个假人，因为懒所以没写修改功能，加错了可以删了再add。
 * `!!bk <kikai>`: 输出一个可点击的界面，自动根据假人是否在线改变选项

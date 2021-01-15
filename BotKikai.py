@@ -47,7 +47,7 @@ help_msg = '''
 §b{prefix_short} reload §r重载插件配置
 §b{prefix_short} add <name> <kikai> §r使用当前玩家参数添加一个名为<name>用于<kikai>的假人
 §b{prefix_short} add <name> <kikai> <dim> <pos> <facing> §r使用自定义参数添加一个名为<name>用于<kikai>的假人
-§b{prefix_short} del <kikai> §r从机器人列表移除用于<kikai>的假人
+§b{prefix_short} del <kikai> §r从假人列表移除用于<kikai>的假人
 §b{prefix_short} <kikai> §r输出一个可点击的界面，自动根据假人是否在线改变选项
 §b{prefix_short} <kikai> spawn §r召唤一个用于<kikai>的假人
 §b{prefix_short} <kikai> kill §r干掉用于<kikai>的假人
@@ -66,7 +66,7 @@ help_body = {
     f"§b{prefix_short} reload": "§r重载插件配置",
     f"§b{prefix_short} add <name> <kikai>": "§r使用当前玩家参数添加一个名为<name>用于<kikai>的假人",
     f"§b{prefix_short} add <name> <kikai> <dim> <pos> <facing>": "§r使用自定义参数添加一个名为<name>用于<kikai>的假人",
-    f"§b{prefix_short} del <kikai>": "§r从机器人列表移除用于<kikai>的假人",
+    f"§b{prefix_short} del <kikai>": "§r从假人列表移除用于<kikai>的假人",
     f"§b{prefix_short} <kikai>": "§r输出一个可点击的界面，自动根据假人是否在线改变选项",
     f'§b{prefix_short} <kikai> spawn': "§r召唤一个用于<kikai>的假人",
     f"§b{prefix_short} <kikai> kill": "§r干掉用于<kikai>的假人",
@@ -91,6 +91,13 @@ def search(kikai):
             return k
 
 
+def auth_player(player):
+    """验证玩家是否为bk假人"""
+    lower_dic = {i.lower(): i for i in bot_dic}
+    bot_name = lower_dic.get(player.lower(), None)
+    return bot_name if bot_name else None
+
+
 def get_pos(server, info):
     PlayerInfoAPI = server.get_plugin_instance('PlayerInfoAPI')
     pos = PlayerInfoAPI.getPlayerInfo(server, info.player, 'Pos')
@@ -100,14 +107,10 @@ def get_pos(server, info):
 
 
 def spawn_cmd(server, info, name):
-    if info.is_player:
-        dim = bot_dic[name]['dim']
-        pos = ' '.join([str(i) for i in bot_dic[name]['pos']])
-        facing = bot_dic[name]['facing']
-        cmd = f'/player {name} spawn at {pos} facing {facing} in {dim}'
-        return cmd
-    else:
-        return f'/player {name} spawn'
+    dim = bot_dic[name]['dim']
+    pos = ' '.join([str(i) for i in bot_dic[name]['pos']])
+    facing = bot_dic[name]['facing']
+    return f'/player {name} spawn at {pos} facing {facing} in {dim}'
 
 
 def spawn(server, info, name):
@@ -120,40 +123,6 @@ def kill(name):
 
 def use(name):
     return f'/player {name} use'
-
-
-def on_load(server, old):
-    global bot_list
-    server.add_help_message(f'{prefix_short}', r.RText(
-        '假人器械映射').c(r.RAction.run_command, f'{prefix_short}').h('点击查看帮助'))
-    if old is not None and old.bot_list is not None:
-        bot_list = old.bot_list
-    else:
-        bot_list = []
-    if not os.path.isfile(config_path):
-        save()
-    else:
-        try:
-            read()
-        except Exception as e:
-            server.say('§b[BotKikai]§4配置加载失败，请确认配置路径是否正确：{}'.format(e))
-
-
-test = {
-    "Fallen_Breath": {
-        "nick": ["伪和平", "主世界伪和平"],
-        "dim": "minecraft:overworld",
-        "pos": [0, 70, 0],
-        "facing": "0 0"
-    }
-}
-
-
-def on_info(server, info):
-    if info.is_user:
-        if info.content.startswith(prefix) or info.content.startswith(prefix_short):
-            args = info.content.split(' ')
-            operate_bot(server, info, args)
 
 
 def operate_bot(server, info, args):
@@ -281,20 +250,17 @@ def operate_bot(server, info, args):
                 if args[2] == "spawn" and permission >= permission_bot:
                     if name not in bot_list:
                         server.execute(spawn(server, info, name))
-                        bot_list.append(name)
                     else:
                         server.reply(info, f"§b[BotKikai]§4假人§d{name}§6（{args[1]}）§4已经在线")
 
                 elif args[2] == "kill" and permission >= permission_bot:
                     if name in bot_list:
                         server.execute(kill(name))
-                        bot_list.remove(name)
                         server.reply(info, f"§b[BotKikai]§a假人§d{name}§6（{args[1]}）§a已被下线")
 
                 elif args[2] == "use" and permission >= permission_bot:
                     if name not in bot_list:
                         server.execute(spawn(server, info, name))
-                        bot_list.append(name)
                         server.reply(info, f"§b[BotKikai]§a已自动创建假人§d{name}§6（{args[1]}）")
                         time.sleep(2)
                     server.execute(use(name))
@@ -304,6 +270,7 @@ def operate_bot(server, info, args):
                     server.reply(info, f"§b[BotKikai]§4参数输入错误，输入§6{prefix_short}§4查看帮助信息")
             else:
                 server.reply(info, f"§b[BotKikai]§4未查询到§d{args[1]}§4对应的假人")
+
     elif len(args) == 4:
         if args[1] == 'add' and permission >= permission_list:
             nick_ls = [] if bot_dic.get(args[2], None) is None else bot_dic.get(args[2])['nick']
@@ -318,9 +285,10 @@ def operate_bot(server, info, args):
                 'facing': f'{facing[0]} {facing[1]}'
             }
             save()
-            server.reply(info, f'§b[BotKikai]§a已添加机器人{args[2]}')
+            server.reply(info, f'§b[BotKikai]§a已添加假人{args[2]}')
         else:
             server.reply(info, '§b[BotKikai]§4命令格式不正确或权限不足')
+
     elif len(args) == 10:
         if args[1] == 'add' and permission >= permission_list:
             if args[4] in dimension_convert.keys():
@@ -338,11 +306,49 @@ def operate_bot(server, info, args):
                     'facing': facing
                 }
                 save()
-                server.reply(info, f'§b[BotKikai]§a已添加机器人{args[2]}')
+                server.reply(info, f'§b[BotKikai]§a已添加假人{args[2]}')
             else:
                 server.reply(info, '§b[BotKikai]§4无法识别的维度')
         else:
             server.reply(info, '§b[BotKikai]§4命令格式不正确或权限不足')
+
+
+def on_load(server, old):
+    global bot_list
+    server.add_help_message(f'{prefix_short}', r.RText(
+        '假人器械映射').c(r.RAction.run_command, f'{prefix_short}').h('点击查看帮助'))
+    if old is not None and old.bot_list is not None:
+        bot_list = old.bot_list
+    else:
+        bot_list = []
+    if not os.path.isfile(config_path):
+        save()
+    else:
+        try:
+            read()
+        except Exception as e:
+            server.say('§b[BotKikai]§4配置加载失败，请确认配置路径是否正确：{}'.format(e))
+
+
+def on_player_joined(server, player, info):
+    bot_name = auth_player(player)
+    if bot_name:
+        if bot_name not in bot_list:
+            bot_list.append(bot_name)
+
+
+def on_player_left(server, player):
+    bot_name = auth_player(player)
+    if bot_name:
+        if bot_name in bot_list:
+            bot_list.remove(bot_name)
+
+
+def on_info(server, info):
+    if info.is_user:
+        if info.content.startswith(prefix) or info.content.startswith(prefix_short):
+            args = info.content.split(' ')
+            operate_bot(server, info, args)
 
 
 def on_server_stop(server, return_code):
