@@ -71,6 +71,8 @@ help_body = {
     f'§b{prefix_short} <kikai> spawn': "§r召唤一个用于<kikai>的假人",
     f"§b{prefix_short} <kikai> kill": "§r干掉用于<kikai>的假人",
     f"§b{prefix_short} <kikai> use": "§r假人右键一次§r（执行此条前无需执行spawn，如假人不在线会自动上线）",
+    f"§b{prefix_short} <kikai> huse": "§r假人持续右键(内测)§r（执行此条前无需执行spawn，如假人不在线会自动上线）",
+    f"§b{prefix_short} <kikai> hatk": "§r假人持续左键(内测)§r（执行此条前无需执行spawn，如假人不在线会自动上线）",
 }
 
 
@@ -110,7 +112,10 @@ def spawn_cmd(server, info, name):
     dim = bot_dic[name]['dim']
     pos = ' '.join([str(i) for i in bot_dic[name]['pos']])
     facing = bot_dic[name]['facing']
-    return f'/player {name} spawn at {pos} facing {facing} in {dim}'
+    if info.is_player:
+        return f'/execute as {info.player} run player {name} spawn at {pos} facing {facing} in {dim}'
+    else:
+        return f'/player {name} spawn at {pos} facing {facing} in {dim}'
 
 
 def spawn(server, info, name):
@@ -123,6 +128,14 @@ def kill(name):
 
 def use(name):
     return f'/player {name} use'
+
+
+def hold_attack(name):
+    return f'/player {name} attack continuous'
+
+
+def hold_use(name):
+    return f'/player {name} use continuous'
 
 
 def operate_bot(server, info, args):
@@ -250,6 +263,7 @@ def operate_bot(server, info, args):
                 if args[2] == "spawn" and permission >= permission_bot:
                     if name not in bot_list:
                         server.execute(spawn(server, info, name))
+                        server.reply(info, f"§b[BotKikai]§a已创建假人§d{name}§6（{args[1]}）")
                     else:
                         server.reply(info, f"§b[BotKikai]§4假人§d{name}§6（{args[1]}）§4已经在线")
 
@@ -265,6 +279,22 @@ def operate_bot(server, info, args):
                         time.sleep(2)
                     server.execute(use(name))
                     server.reply(info, f"§b[BotKikai]§a假人§d{name}§6（{args[1]}）§a右键一次")
+
+                elif args[2] == "huse" and permission >= permission_bot:
+                    if name not in bot_list:
+                        server.execute(spawn(server, info, name))
+                        server.reply(info, f"§b[BotKikai]§a已自动创建假人§d{name}§6（{args[1]}）")
+                        time.sleep(2)
+                    server.execute(hold_use(name))
+                    server.reply(info, f"§b[BotKikai]§a假人§d{name}§6（{args[1]}）§a持续右键")
+
+                elif args[2] == "hatk" and permission >= permission_bot:
+                    if name not in bot_list:
+                        server.execute(spawn(server, info, name))
+                        server.reply(info, f"§b[BotKikai]§a已自动创建假人§d{name}§6（{args[1]}）")
+                        time.sleep(2)
+                    server.execute(hold_attack(name))
+                    server.reply(info, f"§b[BotKikai]§a假人§d{name}§6（{args[1]}）§a持续左键")
 
                 else:
                     server.reply(info, f"§b[BotKikai]§4参数输入错误，输入§6{prefix_short}§4查看帮助信息")
