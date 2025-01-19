@@ -52,7 +52,7 @@
   此假人用于: ['stonebot', '刷石机']
   [点击召唤]  [点击use]  [查看详情]
   ```
-* `!!bk reload`: 重载[BotKikai.json](https://github.com/Jerry-FaGe/MCDR-BotKikai/blob/master/BotKikai.json)配置文件，用于用户修改配置。配置文件详见下文 **关于配置文件**。
+* `!!bk reload`: 重载[BotKikai.json](https://github.com/RayanceKing/MCDR-BotKikai/blob/master/BotKikai.json)配置文件，用于用户修改配置。配置文件详见下文 **关于配置文件**。
 * `!!bk add <name> <kikai>`: 使用玩家当前的维度，坐标，朝向添加一个假人。也就是说如果玩家用准星指着开关使用此指令后，召唤出的假人可以直接use开关。
     **注:** 由于carpet本身原因，假人无法use拉杆，如果机器的开关是拉杆形式的请自行替换成音符盒式或其他支持假人use的方式。
 * `!!bk add <name> <kikai> <dim> <pos> <facing>`: 使用指令中的自定义参数添加一个假人，可用作挂机点等对假人朝向没有要求的场景。
@@ -79,7 +79,7 @@
 
 ## 关于配置文件
 
-配置文件[BotKikai.json](https://github.com/Jerry-FaGe/MCDR-BotKikai/blob/master/BotKikai.json)是一个json格式文件，请把它放在`MCDR/config`文件夹下，如果想实现上文中的效果，它的格式应该如下：
+配置文件[BotKikai.json](https://github.com/RayanceKing/MCDR-BotKikai/blob/master/BotKikai.json)是一个json格式文件，请把它放在`MCDR/config`文件夹下，如果想实现上文中的效果，它的格式应该如下：
 ```JSON
 {
     "Jerry_FaGe": {
@@ -111,4 +111,5 @@
 TODO:
 - [ ] 自动归类同一机器的假人
 - [ ] 分开显示离线和在线假人
-- [ ] 部分操作下指令无反馈
+- [ ] 修复部分操作下指令无反馈
+- [ ] 将权限配置文件化
