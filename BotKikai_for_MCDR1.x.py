@@ -54,7 +54,7 @@ bot_dic = {}
 bot_list = []
 help_msg = '''
 ================== §bBotKikai §r==================
-§6欢迎使用由@Jerry-FaGe开发的假人器械映射插件！
+§6欢迎使用由@Jerry-FaGe开发RayanceKing二改的假人器械映射插件！
 §6你可以在Github搜索MCDR-BotKikai找到本项目！
 「君は道具ではなく、その名が似合う人になろんだ」
 本插件中§d{prefix_short}§r与§d{prefix}§r效果相同，两者可以互相替换
@@ -71,7 +71,7 @@ help_msg = '''
 '''.format(prefix=prefix, prefix_short=prefix_short)
 help_head = """
 ================== §bBotKikai §r==================
-§6欢迎使用由@Jerry-FaGe开发的假人器械映射插件！
+§6欢迎使用由@Jerry-FaGe开发RayanceKing二改的假人器械映射插件！
 §6你可以在Github搜索MCDR-BotKikai找到本项目！
 「君は道具ではなく、その名が似合う人になろんだ」
 本插件中§d{prefix_short}§r与§d{prefix}§r效果相同，两者可以互相替换
@@ -145,7 +145,7 @@ def kill(name):
 
 
 def use(name):
-    return f'/player {name} use'
+    return f'/player {name} use once'
 
 
 def hold_attack(name):
@@ -185,7 +185,7 @@ def operate_bot(server, info, args):
                     bot_msg = RTextList(
                         '\n'
                         f'§7----------- §6{name} §a在线 §7 -----------\n',
-                        f'§7此假人用于:§6 {bot_info["nick"]}\n',
+                        f'§7此假人用于:§6 {bot_info["nick"][1]}\n',
                         # RText('§d[点击use]  ').c(
                         #     RAction.run_command, f'{prefix_short} {name} use').h(f'§6{name}§7右键一次'),
                         # RText('§d[点击下线]  ').c(
@@ -217,7 +217,7 @@ def operate_bot(server, info, args):
                     bot_msg = RTextList(
                         '\n'
                         f'§7----------- §6{name} §4离线 §7 -----------\n',
-                        f'§7此假人用于:§6 {bot_info["nick"]}\n',
+                        f'§7此假人用于:§6 {bot_info["nick"][1]}\n',
                         # f'§7Dimension:§6 {bot_info["dim"]}\n',
                         # RText(
                         #     f'§7Position:§6 {bot_info["pos"]}\n', ).c(
@@ -229,7 +229,7 @@ def operate_bot(server, info, args):
                         RText('§d[点击上线]  ').c(
                             RAction.run_command, f'{prefix_short} {name} spawn').h(f'召唤§6{name}'),
                         RText('§d[点击use]  ').c(
-                            RAction.run_command, f'{prefix_short} {name} use ').h(f'召唤§6{name}§r并右键一次'),
+                            RAction.run_command, f'{prefix_short} {name} use').h(f'召唤§6{name}§r并右键一次'),
                         RText('§d[查看详情]  ').c(
                             RAction.run_command, f'{prefix_short} {name}').h(f'显示§6{name}§r的详细信息')
                     )
@@ -251,7 +251,7 @@ def operate_bot(server, info, args):
                 msg = RTextList(
                     '\n'
                     f'§7----------- §6{name} §4离线 §7-----------\n',
-                    f'§7此假人用于:§6 {bot_dic.get(name)["nick"]}\n',
+                    f'§7此假人用于:§6 {bot_dic.get(name)["nick"][1]}\n',
                     f'§7维度:§6 {bot_dic.get(name)["dim"]}\n',
                     RText(
                         f'§7坐标:§6 {bot_dic.get(name)["pos"]}\n', ).c(
@@ -269,7 +269,7 @@ def operate_bot(server, info, args):
                 msg = RTextList(
                     '\n'
                     f'§7----------- §6{name} §a在线 §7-----------\n',
-                    f'§7此假人用于:§6 {bot_dic.get(name)["nick"]}\n',
+                    f'§7此假人用于:§6 {bot_dic.get(name)["nick"][1]}\n',
                     f'§7维度:§6 {bot_dic.get(name)["dim"]}\n',
                     RText(
                         f'§7坐标:§6 {bot_dic.get(name)["pos"]}\n', ).c(
