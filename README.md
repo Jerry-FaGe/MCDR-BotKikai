@@ -1,10 +1,9 @@
 # MCDR-BotKikai（Bot機械）
 
 适用于[MCDR](https://github.com/Fallen-Breath/MCDReforged)的将假人存储至列表并提供指令映射，便捷放置，操作界面等功能的插件。
-请根据自己的MCDR版本选择安装哪个文件，不带后缀的支持MCDR 0.x,带后缀的支持MCDR 1.x。
-需要安装前置插件[PlayerInfoAPI](https://github.com/TISUnion/PlayerInfoAPI)（MCDR 0.x）或[MinecraftDataAPI](https://github.com/MCDReforged/MinecraftDataAPI)（MCDR 1.x）。
+需要安装前置插件[MinecraftDataAPI](https://github.com/MCDReforged/MinecraftDataAPI)（MCDR 1.x）。
 
-特别感谢[zhang-anzhi](https://github.com/zhang-anzhi)的[Bot](https://github.com/zhang-anzhi/MCDReforgedPlugins/tree/master/Bot)插件提供的部分逻辑。
+特别感谢[AnzhiZhang](https://github.com/AnzhiZhang)的[Bot](https://github.com/AnzhiZhang/MCDReforgedPlugins/tree/master/src/bot)插件提供的部分逻辑。
 
 > 君は道具ではなく、その名が似合う人になろんだ
 
@@ -23,6 +22,10 @@
 !!bk <kikai> spawn 召唤一个用于<kikai>的假人
 !!bk <kikai> kill 干掉用于<kikai>的假人
 !!bk <kikai> use 假人右键一次（执行此条前无需执行spawn，如假人不在线会自动上线）
+!!bk <kikai> huse 假人持续右键
+!!bk <kikai> hatk 假人持续左键
+!!bk <kikai> glowing 假人发光两分钟
+!!bk <kikai> stop 假人停止一切动作
 ```
 
 ## 功能补充
@@ -48,7 +51,7 @@
   此假人用于: ['stonebot', '刷石机']
   [点击召唤]  [点击use]  [查看详情]
   ```
-* `!!bk reload`: 重载[BotKikai.json](https://github.com/Jerry-FaGe/MCDR-BotKikai/blob/master/BotKikai.json)配置文件，用于用户修改配置。配置文件详见下文 **关于配置文件**。
+* `!!bk reload`: 重载[BotKikai.json](https://github.com/RayanceKing/MCDR-BotKikai/blob/master/BotKikai.json)配置文件，用于用户修改配置。配置文件详见下文 **关于配置文件**。
 * `!!bk add <name> <kikai>`: 使用玩家当前的维度，坐标，朝向添加一个假人。也就是说如果玩家用准星指着开关使用此指令后，召唤出的假人可以直接use开关。
     **注:** 由于carpet本身原因，假人无法use拉杆，如果机器的开关是拉杆形式的请自行替换成音符盒式或其他支持假人use的方式。
 * `!!bk add <name> <kikai> <dim> <pos> <facing>`: 使用指令中的自定义参数添加一个假人，可用作挂机点等对假人朝向没有要求的场景。
@@ -75,7 +78,7 @@
 
 ## 关于配置文件
 
-配置文件[BotKikai.json](https://github.com/Jerry-FaGe/MCDR-BotKikai/blob/master/BotKikai.json)是一个json格式文件，请把它放在`MCDR/config`文件夹下，如果想实现上文中的效果，它的格式应该如下：
+配置文件[BotKikai.json](https://github.com/RayanceKing/MCDR-BotKikai/blob/master/BotKikai.json)是一个json格式文件，请把它放在`MCDR/config`文件夹下，如果想实现上文中的效果，它的格式应该如下：
 ```JSON
 {
     "Jerry_FaGe": {
@@ -103,3 +106,9 @@
 ## 声明
 
 本插件实现的功能只要是装了carpet mod能召唤假人的服务端都可以实现，即便是这样也仍有可能引发争议。烦请想装本插件的腐竹实装前务必了解下成员们的意愿。
+
+TODO:
+- [ ] 自动归类同一机器的假人
+- [ ] 分开显示离线和在线假人
+- [ ] 修复部分操作下指令无反馈
+- [ ] 将权限配置文件化

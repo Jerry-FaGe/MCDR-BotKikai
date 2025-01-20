@@ -1,0 +1,11 @@
+{
+	"id": "botkikai",
+	"version": "0.0.2",
+	"name": "BotKikai",
+	"description": "适用于MCDR的将假人存储至列表并提供指令映射，便捷放置，操作界面等功能的插件。",
+	"author": ["RayanceKing","Jerry-FaGe"],
+	"link": "https://github.com/RayanceKing/MCDR-BotKikai",
+	"dependencies": {
+		"mcdreforged": ">=2.0.0"
+	}
+}
