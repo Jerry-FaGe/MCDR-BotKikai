@@ -1,10 +1,9 @@
 # MCDR-BotKikai（Bot機械）
 
 适用于[MCDR](https://github.com/Fallen-Breath/MCDReforged)的将假人存储至列表并提供指令映射，便捷放置，操作界面等功能的插件。
-请根据自己的MCDR版本选择安装哪个文件，不带后缀的支持MCDR 0.x,带后缀的支持MCDR 1.x。
-需要安装前置插件[PlayerInfoAPI](https://github.com/TISUnion/PlayerInfoAPI)（MCDR 0.x）或[MinecraftDataAPI](https://github.com/MCDReforged/MinecraftDataAPI)（MCDR 1.x）。
+需要安装前置插件[MinecraftDataAPI](https://github.com/MCDReforged/MinecraftDataAPI)（MCDR 1.x）。
 
-特别感谢[zhang-anzhi](https://github.com/zhang-anzhi)的[Bot](https://github.com/zhang-anzhi/MCDReforgedPlugins/tree/master/Bot)插件提供的部分逻辑。
+特别感谢[AnzhiZhang]((https://github.com/AnzhiZhang))的[Bot](https://github.com/AnzhiZhang/MCDReforgedPlugins/tree/master/src/bot)插件提供的部分逻辑。
 
 > 君は道具ではなく、その名が似合う人になろんだ
 
