@@ -1,12 +1,3 @@
-#!/usr/bin/python3
-# -*-coding:utf-8-*-
-"""
-Created on 2025/1/19
-
-@author: Jerry_FaGe
-
-updated by RayanceKing
-"""
 import os
 import json
 import time
@@ -305,51 +296,41 @@ def operate_bot(server, info, args):
                 if args[2] == "spawn" and permission >= permission_bot:
                     if name not in bot_list:
                         server.execute(spawn(server, info, name))
-                        server.reply(info, f"§b[BotKikai]§a已创建假人§d{
-                                     name}§6（{args[1]}）")
+                        server.reply(info, f"§b[BotKikai]§a已创建假人§d{name}§6（{args[1]}）")
                     else:
-                        server.reply(info, f"§b[BotKikai]§4假人§d{
-                                     name}§6（{args[1]}）§4已经在线")
+                        server.reply(info, f"§b[BotKikai]§4假人§d{name}§6（{args[1]}）§4已经在线")
 
                 elif args[2] == "kill" and permission >= permission_bot:
                     if name in bot_list:
                         server.execute(kill(name))
-                        server.reply(info, f"§b[BotKikai]§a假人§d{
-                                     name}§6（{args[1]}）§a已被下线")
+                        server.reply(info, f"§b[BotKikai]§a假人§d{name}§6（{args[1]}）§a已被下线")
 
                 elif args[2] == "use" and permission >= permission_bot:
                     if name not in bot_list:
                         server.execute(spawn(server, info, name))
-                        server.reply(info, f"§b[BotKikai]§a已自动创建假人§d{
-                                     name}§6（{args[1]}）")
+                        server.reply(info, f"§b[BotKikai]§a已自动创建假人§d{name}§6（{args[1]}）")
                         time.sleep(2)
                     server.execute(use(name))
-                    server.reply(info, f"§b[BotKikai]§a假人§d{
-                                 name}§6（{args[1]}）§a右键一次")
+                    server.reply(info, f"§b[BotKikai]§a假人§d{name}§6（{args[1]}）§a右键一次")
 
                 elif args[2] == "huse" and permission >= permission_bot:
                     if name not in bot_list:
                         server.execute(spawn(server, info, name))
-                        server.reply(info, f"§b[BotKikai]§a已自动创建假人§d{
-                                     name}§6（{args[1]}）")
+                        server.reply(info, f"§b[BotKikai]§a已自动创建假人§d{name}§6（{args[1]}）")
                         time.sleep(2)
                     server.execute(hold_use(name))
-                    server.reply(info, f"§b[BotKikai]§a假人§d{
-                                 name}§6（{args[1]}）§a持续右键")
+                    server.reply(info, f"§b[BotKikai]§a假人§d{name}§6（{args[1]}）§a持续右键")
 
                 elif args[2] == "hatk" and permission >= permission_bot:
                     if name not in bot_list:
                         server.execute(spawn(server, info, name))
-                        server.reply(info, f"§b[BotKikai]§a已自动创建假人§d{
-                                     name}§6（{args[1]}）")
+                        server.reply(info, f"§b[BotKikai]§a已自动创建假人§d{name}§6（{args[1]}）")
                         time.sleep(2)
                     server.execute(hold_attack(name))
-                    server.reply(info, f"§b[BotKikai]§a假人§d{
-                                 name}§6（{args[1]}）§a持续左键")
+                    server.reply(info, f"§b[BotKikai]§a假人§d{name}§6（{args[1]}）§a持续左键")
 
                 else:
-                    server.reply(info, f"§b[BotKikai]§4参数输入错误，输入§6{
-                                 prefix_short}§4查看帮助信息")
+                    server.reply(info, f"§b[BotKikai]§4参数输入错误，输入§6{prefix_short}§4查看帮助信息")
             else:
                 server.reply(info, f"§b[BotKikai]§4未查询到§d{args[1]}§4对应的假人")
 

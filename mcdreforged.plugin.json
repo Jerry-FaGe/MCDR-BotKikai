@@ -1,11 +1,18 @@
 {
-	"id": "botkikai",
+	"id": "bot_kikai",
 	"version": "0.0.2",
 	"name": "BotKikai",
-	"description": "适用于MCDR的将假人存储至列表并提供指令映射，便捷放置，操作界面等功能的插件。",
-	"author": ["RayanceKing","Jerry-FaGe"],
-	"link": "https://github.com/RayanceKing/MCDR-BotKikai",
+	"description": {
+		"zh_cn": "适用于MCDR的将假人存储至列表并提供指令映射，便捷放置，操作界面等功能的插件。"
+	},
+	"author": ["Jerry-FaGe", "RayanceKing"],
+	"link": "https://github.com/Jerry-FaGe/MCDR-BotKikai",
 	"dependencies": {
-		"mcdreforged": ">=2.0.0"
-	}
+		"mcdreforged": ">=2.0.0",
+		"minecraft_data_api": "*"
+	},
+	"resources": [
+		"LICENSE",
+		"BotKikai.json"
+	]
 }
