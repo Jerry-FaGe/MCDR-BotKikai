@@ -2,3 +2,5 @@
 *.mcdr
 .vscode
 .idea
+__pycache__
+*.pyc
