@@ -1,0 +1,20 @@
+{
+    "Jerry_FaGe": {
+        "nicknames": ["Jerry_FaGe", "发哥", "开发者", "test"],
+        "dimension": "minecraft:overworld",
+        "position": [0, 70, 0],
+        "facing": [0, 0]
+    },
+    "SandBot": {
+        "nicknames": ["SandBot", "刷沙机", "shuashaji"],
+        "dimension": "minecraft:overworld",
+        "position": [-2.439826988598193, 7.0, -5.05480960268401],
+        "facing": [180.59103, 29.550417]
+    },
+    "Stonebot": {
+        "nicknames": ["Stonebot", "刷石机", "shuashiji"],
+        "dimension": "minecraft:overworld",
+        "position": [4.589996529809662, 7.0, -4.426900981652432],
+        "facing": [-214.02008, 31.20023]
+    }
+}

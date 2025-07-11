@@ -1,35 +1,37 @@
 from mcdreforged.api.types import PluginServerInterface, Info
 
-from .storage import init_storage, storage_instance
+from .bot_manager import BotManager
 from .command import register_command_tree
 
 
+bot_manager_instance: BotManager | None = None
+
+
 def on_load(server: PluginServerInterface, old):
-    global storage_instance
-    storage_instance = init_storage(server)
+    global bot_manager_instance
+    bot_manager_instance = BotManager(server)
     
     # 在重载时保留在线列表
-    if old is not None and hasattr(old, 'storage_instance') and old.storage_instance is not None:
-        online_bots = old.storage_instance.get_online_bots()
-        storage_instance.set_online_bots(online_bots)
+    if old is not None and hasattr(old, 'bot_manager_instance') and old.bot_manager_instance is not None:
+        online_bots_name = [bot.name for bot in old.bot_manager_instance.get_online_bots()]
+        for bot_name in online_bots_name:
+            bot_manager_instance.set_bot_online(bot_name)
 
-    register_command_tree(server)
+    register_command_tree(server, bot_manager_instance)
 
     server.register_help_message('!!bk', '假人器械映射插件')
 
 
 def on_player_joined(server: PluginServerInterface, player: str, info: Info):
-    bot_name = storage_instance.auth_player(player)
-    if bot_name:
-        storage_instance.set_bot_online(bot_name)
+    if bot_manager_instance and bot_manager_instance.auth_player(player):
+        bot_manager_instance.set_bot_online(player)
 
 
 def on_player_left(server: PluginServerInterface, player: str):
-    bot_name = storage_instance.auth_player(player)
-    if bot_name:
-        storage_instance.set_bot_offline(bot_name)
+    if bot_manager_instance and bot_manager_instance.auth_player(player):
+        bot_manager_instance.set_bot_offline(player)
 
 
 def on_server_stop(server: PluginServerInterface, return_code: int):
-    if storage_instance:
-        storage_instance.clear_online_bots()
+    if bot_manager_instance:
+        bot_manager_instance.clear_all_online_status()

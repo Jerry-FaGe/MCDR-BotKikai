@@ -1,16 +1,12 @@
-from mcdreforged.api.types import PluginServerInterface, ServerInterface, Info
-
-from . import storage
-
+from mcdreforged.api.types import ServerInterface
 
 prefix_short = '!!bk'
-prefix = '!!botkikai'
 
 # 操作假人(spawn,use,kill)的最低权限  guest: 0, user: 1, helper: 2, admin: 3, owner: 4
-permission_bot = 0
+permission_bot = 1
 
 # 操作假人列表(add,remove)的最低权限  guest: 0, user: 1, helper: 2, admin: 3, owner: 4
-permission_list = 0
+permission_list = 3
 
 dimension_convert = {
     '0': 'minecraft:overworld',
@@ -29,32 +25,35 @@ dimension_convert = {
     'xiajie': 'minecraft:the_nether',
     'modi': 'minecraft:the_end'
 }
+
 help_head = """
 ================== §bBotKikai §r==================
-§6欢迎使用由@Jerry-FaGe开发RayanceKing二改的假人器械映射插件！
-§6你可以在Github搜索MCDR-BotKikai找到本项目！
-「君は道具ではなく、その名が似合う人になろんだ」
-本插件中§d{prefix_short}§r与§d{prefix}§r效果相同，两者可以互相替换
-""".format(prefix=prefix, prefix_short=prefix_short)
+§6欢迎使用由 @Jerry-FaGe 开发的假人器械映射插件！
+§6你可以在 Github 搜索 MCDR-BotKikai 找到本项目！
+§7「君は道具ではなく、その名が似合う人になろんだ」
+===========================================
+"""
+
 help_body = {
-    f"§b{prefix_short}": "§r显示本帮助信息",
-    f"§b{prefix_short} list": "§r显示假人列表",
-    f"§b{prefix_short} reload": "§r重载插件配置",
-    f"§b{prefix_short} add <name> <kikai>": "§r使用当前玩家参数添加一个名为<name>用于<kikai>的假人",
-    f"§b{prefix_short} add <name> <kikai> <dim> <pos> <facing>": "§r使用自定义参数添加一个名为<name>用于<kikai>的假人",
-    f"§b{prefix_short} del <kikai>": "§r从假人列表移除用于<kikai>的假人",
-    f"§b{prefix_short} <kikai>": "§r输出一个可点击的界面，自动根据假人是否在线改变选项",
-    f'§b{prefix_short} <kikai> spawn': "§r召唤一个用于<kikai>的假人",
-    f"§b{prefix_short} <kikai> kill": "§r干掉用于<kikai>的假人",
-    f"§b{prefix_short} <kikai> use": "§r假人右键一次§r（执行此条前无需执行spawn，如假人不在线会自动上线）",
-    f"§b{prefix_short} <kikai> huse": "§r假人持续右键§r（执行此条前无需执行spawn，如假人不在线会自动上线）",
-    f"§b{prefix_short} <kikai> hatk": "§r假人持续左键§r（执行此条前无需执行spawn，如假人不在线会自动上线）",
-    f"§b{prefix_short} <kikai> glowing": "§r假人发光两分钟",
-    f"§b{prefix_short} <kikai> stop": "§r假人停止一切动作",
+    f"§7{prefix_short}": "§r显示本帮助信息",
+    f"§7{prefix_short} list": "§r显示假人列表",
+    f"§7{prefix_short} reload": "§r重载插件配置",
+    f"§7{prefix_short} add <name> <kikai>": "§r使用当前玩家参数添加一个名为<name>用于<kikai>的假人",
+    f"§7{prefix_short} add <name> <kikai> <dim> <pos> <facing>": "§r使用自定义参数添加一个名为<name>用于<kikai>的假人",
+    f"§7{prefix_short} del <kikai>": "§r从假人列表移除用于<kikai>的假人",
+    f"§7{prefix_short} <kikai>": "§r输出一个可点击的界面，自动根据假人是否在线改变选项",
+    f'§7{prefix_short} <kikai> spawn': "§r召唤一个用于<kikai>的假人",
+    f"§7{prefix_short} <kikai> kill": "§r干掉用于<kikai>的假人",
+    f"§7{prefix_short} <kikai> where": "§r假人发光两分钟并输出坐标",
+    f"§7{prefix_short} <kikai> use": "§r假人右键一次",
+    f"§7{prefix_short} <kikai> huse <interval>": "§r假人持续右键，后接正整数可控制间隔 gt",
+    f"§7{prefix_short} <kikai> atk": "§r假人左键一次",
+    f"§7{prefix_short} <kikai> hatk <interval>": "§r假人持续左键, 后接正整数可控制间隔 gt",
+    f"§7{prefix_short} <kikai> stop": "§r假人停止一切动作",
 }
 
 
-def get_pos(server: ServerInterface, player_name: str)
+def get_pos(server: ServerInterface, player_name: str):
     try:
         import minecraft_data_api as api
     except ImportError:
@@ -64,33 +63,3 @@ def get_pos(server: ServerInterface, player_name: str)
     dim = api.get_player_info(player_name, 'Dimension')
     facing = api.get_player_info(player_name, 'Rotation')
     return pos, dim, facing
-
-def spawn_cmd(name: str):
-    bot_info = storage.storage_instance.get_bot_info(name)
-    if not bot_info:
-        return None
-    dim = bot_info['dim']
-    pos = ' '.join([str(i) for i in bot_info['pos']])
-    facing = bot_info['facing']
-    return f'player {name} spawn at {pos} facing {facing} in {dim}'
-
-def kill(name: str):
-    return f'/player {name} kill'
-
-def use(name: str):
-    return f'/player {name} use once'
-
-def hold_attack(name: str):
-    return f'/player {name} attack continuous'
-
-def attack_12gt(name: str):
-    return f'/player {name} attack interval 12'
-
-def hold_use(name: str):
-    return f'/player {name} use continuous'
-
-def glowing(name: str):
-    return f'/effect give {name} glowing 120'
-
-def stop(name: str):
-    return f'/player {name} stop'
