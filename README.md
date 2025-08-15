@@ -11,7 +11,7 @@
 
 ```Minecraft
 !!bk: 显示本帮助信息
-!!bk list: 显示假人列表
+!!bk list [online|offline]: 显示假人列表，可筛选在线或离线
 !!bk reload: 重载插件配置
 !!bk add <name> <kikai>: 使用当前玩家参数添加一个名为<name>用于<kikai>的假人
 !!bk add <name> <kikai> <dim> <pos> <facing>: 使用自定义参数添加一个名为<name>用于<kikai>的假人
@@ -38,9 +38,11 @@
     
 * 本插件支持MCDR的权限系统，可以在 `utils.py` 文件修改使用指令的权限等级。
 
-    默认的权限配置为：user 及以上组可以操作假人 (spawn, use ,kill)，admin 及以上组可以操作假人列表 (add, remove)
+    默认的权限配置为：
+    * user 及以上组可以操作假人 (spawn, use ,kill)
+    * admin 及以上组可以操作假人列表 (add, remove)
 
-* `!!bk list`: 输出一个类似下面的界面，显示本插件储存的所有假人，可以通过点击进行操作。
+* `!!bk list`: 输出一个类似下面的界面，不带参数可以显示本插件储存的所有假人，带上 `online/offline` 参数可以单独显示当前在线或离线的假人，可以通过点击进行操作。
   ```Minecraft
   ----------- Jerry_FaGe 在线 -----------
   此假人用于: 发哥, 开发者, test
@@ -118,6 +120,6 @@
 特别感谢 [AnzhiZhang](https://github.com/AnzhiZhang) 的 [Bot](https://github.com/AnzhiZhang/MCDReforgedPlugins/tree/master/src/bot) 插件提供的部分逻辑。
 
 TODO:
-- [ ] 分开显示离线和在线假人
+- [x] 分开显示离线和在线假人
 - [ ] 修复部分操作下指令无反馈
 - [ ] 将权限配置文件化

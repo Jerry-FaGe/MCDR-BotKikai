@@ -71,6 +71,9 @@ class BotManager:
     def get_online_bots(self) -> list[Bot]:
         return [bot for bot in self.bots.values() if bot.is_online]
 
+    def get_offline_bots(self) -> list[Bot]:
+        return [bot for bot in self.bots.values() if not bot.is_online]
+
     def set_bot_online(self, name: str):
         bot = self.get_bot(name)
         if bot:

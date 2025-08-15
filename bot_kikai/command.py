@@ -15,10 +15,21 @@ def show_help(source: CommandSource):
         for k, v in utils.help_body.items()]
     source.reply(RTextList(*(head + body)))
 
-def list_bots(source: CommandSource, bot_manager: BotManager):
+def list_bots(source: CommandSource, bot_manager: BotManager, status: str = 'all'):
+    bots_to_show: list[Bot] = []
+    if status == 'online':
+        bots_to_show = bot_manager.get_online_bots()
+    elif status == 'offline':
+        bots_to_show = bot_manager.get_offline_bots()
+    else:
+        bots_to_show = bot_manager.get_all_bots()
+
+    if not bots_to_show:
+        source.reply("§b[BotKikai] §7没有找到符合条件的假人")
+        return
+
     msg_list: list[RTextList] = []
-    all_bots = bot_manager.get_all_bots()
-    for bot in all_bots:
+    for bot in bots_to_show:
         msg_list.append(bot.get_simple_rtext())
         msg_list.append(RTextList("\n"))
     source.reply(RTextList(*msg_list))
@@ -201,8 +212,16 @@ def register_command_tree(server: PluginServerInterface, bot_manager: BotManager
         Text('nickname').runs(lambda src, ctx: del_bot(src, ctx, bot_manager))
     )
 
+    list_node = Literal('list').runs(
+        lambda src: list_bots(src, bot_manager, 'all')
+    ).then(
+        Literal('online').runs(lambda src: list_bots(src, bot_manager, 'online'))
+    ).then(
+        Literal('offline').runs(lambda src: list_bots(src, bot_manager, 'offline'))
+    )
+
     root = Literal(utils.prefix_short).runs(show_help).then(
-        Literal('list').runs(lambda src: list_bots(src, bot_manager))
+        list_node
     ).then(
         Literal('reload').requires(lambda src: src.has_permission(utils.permission_list)).runs(lambda src: reload_plugin(src, bot_manager))
     ).then(

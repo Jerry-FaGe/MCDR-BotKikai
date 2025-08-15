@@ -36,7 +36,7 @@ help_head = """
 
 help_body = {
     f"§7{prefix_short}": "§r显示本帮助信息",
-    f"§7{prefix_short} list": "§r显示假人列表",
+    f"§7{prefix_short} list [online|offline]": "§r显示假人列表，可筛选在线或离线",
     f"§7{prefix_short} reload": "§r重载插件配置",
     f"§7{prefix_short} add <name> <kikai>": "§r使用当前玩家参数添加一个名为<name>用于<kikai>的假人",
     f"§7{prefix_short} add <name> <kikai> <dim> <pos> <facing>": "§r使用自定义参数添加一个名为<name>用于<kikai>的假人",
