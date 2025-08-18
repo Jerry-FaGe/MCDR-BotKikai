@@ -1,6 +1,6 @@
 {
 	"id": "bot_kikai",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"name": "BotKikai",
 	"description": {
 		"zh_cn": "适用于 MCDR 的将假人存储至列表并提供指令映射，便捷放置，操作界面等功能的插件。"
