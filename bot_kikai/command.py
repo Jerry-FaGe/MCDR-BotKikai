@@ -56,13 +56,15 @@ def _add_bot_simple(source: PlayerCommandSource, context: dict, bot_manager: Bot
         bot.position = pos
         bot.dimension = dim
         bot.facing = facing
+        bot_manager.add_bot(bot)
+        source.reply(f'§b[BotKikai] §a已修改假人 §6{name} §d({nickname})')
     else:
         nick_ls = [name]
         if nickname != name:
             nick_ls.append(nickname)
         bot = Bot(source.get_server(), name, nick_ls, dim, pos, facing)
         bot_manager.add_bot(bot)
-        source.reply(f'§b[BotKikai] §a已添加假人 §6{name}')
+        source.reply(f'§b[BotKikai] §a已添加假人 §6{name} §d({nickname})')
 
 def add_bot_simple(source: CommandSource, context: dict, bot_manager: BotManager):
     if not isinstance(source, PlayerCommandSource):
@@ -86,13 +88,15 @@ def add_bot_full(source: CommandSource, context: dict, bot_manager: BotManager):
         bot.dimension = dim
         bot.position = pos
         bot.facing = facing
+        bot_manager.add_bot(bot)
+        source.reply(f'§b[BotKikai] §a已修改假人 §6{name} §d({nickname})')
     else:
         nick_ls = [name]
         if nickname != name:
             nick_ls.append(nickname)
         bot = Bot(source.get_server(), name, nick_ls, dim, pos, facing)
         bot_manager.add_bot(bot)
-        source.reply(f'§b[BotKikai] §a已添加假人 {name}')
+        source.reply(f'§b[BotKikai] §a已添加假人 {name} §d({nickname})')
 
 def del_bot(source: CommandSource, context: dict, bot_manager: BotManager):
     nickname = context["nickname"]

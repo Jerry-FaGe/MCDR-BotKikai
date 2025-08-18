@@ -115,11 +115,11 @@
 
 ## 声明
 
-本插件实现的功能只要是装了 Carpet Mod 能召唤假人的服务端都可以实现，即便是这样也仍有可能引发争议。烦请想装本插件的腐竹实装前务必了解下成员们的意愿。
+本插件实现的功能只要是装了 Carpet Mod 能召唤假人的服务端都可以实现，即便是这样也仍有可能引发**不香草**争议。烦请想装本插件的腐竹实装前务必了解下成员们的意愿。
 
 特别感谢 [AnzhiZhang](https://github.com/AnzhiZhang) 的 [Bot](https://github.com/AnzhiZhang/MCDReforgedPlugins/tree/master/src/bot) 插件提供的部分逻辑。
 
 TODO:
 - [x] 分开显示离线和在线假人
-- [ ] 修复部分操作下指令无反馈
+- [x] 修复部分操作下指令无反馈
 - [ ] 将权限配置文件化
