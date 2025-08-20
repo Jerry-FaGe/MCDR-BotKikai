@@ -41,6 +41,7 @@ def reload_plugin(source: CommandSource, bot_manager: BotManager):
     else:
         source.reply('§b[BotKikai] §a由控制台发起的配置文件重载成功')
 
+@new_thread("botkikai_add")
 def _add_bot_simple(source: PlayerCommandSource, context: dict, bot_manager: BotManager):
     name, nickname = context["name"], context["nickname"]
     
@@ -70,7 +71,7 @@ def add_bot_simple(source: CommandSource, context: dict, bot_manager: BotManager
     if not isinstance(source, PlayerCommandSource):
         source.reply("§b[BotKikai] §c该指令只能由玩家执行")
         return
-    new_thread("botkikai_add")(_add_bot_simple)(source, context, bot_manager)
+    _add_bot_simple(source, context, bot_manager)
 
 def add_bot_full(source: CommandSource, context: dict, bot_manager: BotManager):
     name, nickname, dim_str = context["name"], context["nickname"], context["dim"]
@@ -107,7 +108,8 @@ def del_bot(source: CommandSource, context: dict, bot_manager: BotManager):
     else:
         source.reply(f"§b[BotKikai] §4未查询到 §6{nickname} §4对应的假人")
 
-def bot_action(source: CommandSource, context: dict, action: str, bot_manager: BotManager):
+@new_thread("botkikai_action")
+def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: BotManager):
     nickname = context['nickname']
     bot = bot_manager.get_bot_by_nickname(nickname)
     if not bot:
@@ -165,6 +167,9 @@ def bot_action(source: CommandSource, context: dict, action: str, bot_manager: B
     elif action == 'stop':
         bot.stop()
         source.reply(f"§b[BotKikai] §a假人 §6{bot.name} §d({nickname}) §a停止所有动作")
+
+def bot_action(source: CommandSource, context: dict, action: str, bot_manager: BotManager):
+    _bot_action(source, context, action, bot_manager)
 
 
 def register_command_tree(server: PluginServerInterface, bot_manager: BotManager):

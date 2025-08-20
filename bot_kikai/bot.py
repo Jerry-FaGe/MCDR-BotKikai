@@ -56,7 +56,18 @@ class Bot:
     def _ensure_online(self, executor: str | None = None):
         if not self.is_online:
             self.spawn(executor=executor)
-            time.sleep(3)
+            
+            # TODO 考虑独立配置文件
+            max_wait_time = 10  # 自动上线等待时间
+            wait_interval = 0.5  # 自动上线检查间隔
+            waited_time = 0
+            
+            while not self.is_online and waited_time < max_wait_time:
+                time.sleep(wait_interval)
+                waited_time += wait_interval
+            
+            if not self.is_online:
+                self.server.logger.warning(f"[BotKikai] 假人 {self.name} 在 {max_wait_time} 秒内未能成功上线，后续动作可能失败")
 
     # --- 交互动作 ---
 
