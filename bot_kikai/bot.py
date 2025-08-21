@@ -146,7 +146,8 @@ class Bot:
         )
 
     def get_info_rtext(self) -> RTextList:
-        nickname = ", ".join(self.nicknames[1:])
+        nickname_ls = list(filter(lambda x: x.lower() != self.name.lower(), self.nicknames))
+        nickname = ", ".join(nickname_ls)
         online_status = '§a在线' if self.is_online else '§4离线'
         return RTextList(
             f'§7----------- §6{self.name} {online_status} §7-----------',
@@ -158,7 +159,8 @@ class Bot:
         )
     
     def get_simple_rtext(self) -> RTextList:
-        nickname = ", ".join(self.nicknames[1:])
+        nickname_ls = list(filter(lambda x: x.lower() != self.name.lower(), self.nicknames))
+        nickname = ", ".join(nickname_ls)
         online_status = '§a在线' if self.is_online else '§4离线'
         return RTextList(
             '\n'

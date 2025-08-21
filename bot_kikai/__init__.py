@@ -23,13 +23,23 @@ def on_load(server: PluginServerInterface, old):
 
 
 def on_player_joined(server: PluginServerInterface, player: str, info: Info):
-    if bot_manager_instance and bot_manager_instance.auth_player(player):
-        bot_manager_instance.set_bot_online(player)
+    if bot_manager_instance:
+        bot_name_from_config = bot_manager_instance.auth_player(player)
+        if bot_name_from_config:
+            bot_manager_instance.set_bot_online(bot_name_from_config)
+            
+            # 自动将假人的真实名字加入昵称列表
+            bot = bot_manager_instance.get_bot(bot_name_from_config)
+            if bot and player not in bot.nicknames:
+                bot.nicknames.append(player)
+                bot_manager_instance.save()
 
 
 def on_player_left(server: PluginServerInterface, player: str):
-    if bot_manager_instance and bot_manager_instance.auth_player(player):
-        bot_manager_instance.set_bot_offline(player)
+    if bot_manager_instance:
+        bot_name_from_config = bot_manager_instance.auth_player(player)
+        if bot_name_from_config:
+            bot_manager_instance.set_bot_offline(bot_name_from_config)
 
 
 def on_server_stop(server: PluginServerInterface, return_code: int):
