@@ -1,6 +1,6 @@
 {
 	"id": "bot_kikai",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"name": "BotKikai",
 	"description": {
 		"zh_cn": "使用中文名称即可将假人精准召唤到任意位置，支持多种动作。"
