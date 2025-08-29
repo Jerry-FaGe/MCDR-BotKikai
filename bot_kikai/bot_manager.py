@@ -5,32 +5,34 @@ import json
 from mcdreforged.api.types import PluginServerInterface
 
 from .bot import Bot
+from .config import config
 
 
 class BotManager:
     def __init__(self, server: PluginServerInterface):
         self.server = server
-        data_folder = server.get_data_folder()
-        if not os.path.exists(data_folder):
-            os.makedirs(data_folder)
-        self.config_path = os.path.join(data_folder, 'config.json')
         self.bots = {}  # type: dict[str, Bot]
         self.load()
 
     def load(self):
-        if not os.path.isfile(self.config_path):
+        if not config.bots_path or not os.path.isfile(config.bots_path):
             self.save()
             return
-        with open(self.config_path, 'r', encoding='utf8') as f:
+
+        with open(config.bots_path, 'r', encoding='utf8') as f:
             try:
                 bots_data = json.load(f)
             except json.JSONDecodeError:
                 bots_data = {}
+
         
         for name, data in bots_data.items():
             self.bots[name] = Bot.from_dict(self.server, name, data)
 
     def save(self):
+        if not config.bots_path:
+            return
+
         bots_data = {name: bot.to_dict() for name, bot in self.bots.items()}
         json_text = json.dumps(bots_data, ensure_ascii=False, indent=4)
 
@@ -42,7 +44,7 @@ class BotManager:
 
         json_compact = pattern.sub(compact_array, json_text)
 
-        with open(self.config_path, 'w', encoding='utf8') as f:
+        with open(config.bots_path, 'w', encoding='utf8') as f:
             f.write(json_compact)
 
     def add_bot(self, bot: Bot):

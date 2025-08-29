@@ -1,17 +1,18 @@
 from mcdreforged.api.decorator import new_thread
 from mcdreforged.api.command import Literal, Text, Float, Integer
-from mcdreforged.api.types import PluginServerInterface, CommandSource, PlayerCommandSource, ConsoleCommandSource
+from mcdreforged.api.types import PluginServerInterface, CommandSource, PlayerCommandSource
 from mcdreforged.api.rtext import RTextList, RText, RAction
 
 from .bot_manager import BotManager
 from .bot import Bot
+from .config import config
 from . import utils
 
 
 def show_help(source: CommandSource):
     head = [utils.help_head]
-    body = [RText(f'{k}: {v}\n').c(
-        RAction.suggest_command, k.replace('§7', '')).h(v)
+    body = [RText(f'{k}§7: {v}\n').c(
+        RAction.suggest_command, k.replace('§7', '').replace('§6', '')).h(v)
         for k, v in utils.help_body.items()]
     source.reply(RTextList(*(head + body)))
 
@@ -35,6 +36,7 @@ def list_bots(source: CommandSource, bot_manager: BotManager, status: str = 'all
     source.reply(RTextList(*msg_list))
 
 def reload_plugin(source: CommandSource, bot_manager: BotManager):
+    config.load()
     bot_manager.load()
     if isinstance(source, PlayerCommandSource):
         source.reply(f'§b[BotKikai] §a由{source.player}§a发起的配置文件重载成功')
@@ -120,7 +122,7 @@ def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: 
         source.reply(bot.get_info_rtext())
         return
 
-    if not source.has_permission(utils.permission_bot):
+    if not source.has_permission(config.permission['bot']):
         source.reply('§b[BotKikai] §c权限不足')
         return
     
@@ -199,7 +201,7 @@ def register_command_tree(server: PluginServerInterface, bot_manager: BotManager
         Literal('stop').runs(lambda src, ctx: bot_action(src, ctx, 'stop', bot_manager))
     )
 
-    add_node = Literal('add').requires(lambda src: src.has_permission(utils.permission_list)).then(
+    add_node = Literal('add').requires(lambda src: src.has_permission(config.permission['list'])).then(
         Text('name').then(
             Text('nickname').runs(lambda src, ctx: add_bot_simple(src, ctx, bot_manager)).then(
                 Text('dim').then(
@@ -217,7 +219,7 @@ def register_command_tree(server: PluginServerInterface, bot_manager: BotManager
         )
     )
 
-    del_node = Literal('del').requires(lambda src: src.has_permission(utils.permission_list)).then(
+    del_node = Literal('del').requires(lambda src: src.has_permission(config.permission['list'])).then(
         Text('nickname').runs(lambda src, ctx: del_bot(src, ctx, bot_manager))
     )
 
@@ -229,10 +231,10 @@ def register_command_tree(server: PluginServerInterface, bot_manager: BotManager
         Literal('offline').runs(lambda src: list_bots(src, bot_manager, 'offline'))
     )
 
-    root = Literal(utils.prefix_short).runs(show_help).then(
+    root = Literal(config.prefix_short).runs(show_help).then(
         list_node
     ).then(
-        Literal('reload').requires(lambda src: src.has_permission(utils.permission_list)).runs(lambda src: reload_plugin(src, bot_manager))
+        Literal('reload').requires(lambda src: src.has_permission(config.permission['list'])).runs(lambda src: reload_plugin(src, bot_manager))
     ).then(
         add_node
     ).then(

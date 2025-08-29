@@ -1,0 +1,38 @@
+{
+    "Jerry_FaGe": {
+        "nicknames": ["Jerry_FaGe", "发哥", "开发者", "test"],
+        "dimension": "minecraft:overworld",
+        "position": [0, 70, 0],
+        "facing": [0, 0]
+    },
+    "hsds": {
+        "nicknames": ["hsds", "红石灯"],
+        "dimension": "minecraft:overworld",
+        "position": [-3.572488972248724, 7, -2.396779686096531],
+        "facing": [-174.60002, 53.10003]
+    },
+    "zhong": {
+        "nicknames": ["zhong", "钟", "Zhong"],
+        "dimension": "minecraft:overworld",
+        "position": [4.019804605261402, 7, -8.465910631414928],
+        "facing": [-90.89998, 51.00003]
+    },
+    "kan": {
+        "nicknames": ["kan", "攻击"],
+        "dimension": "minecraft:overworld",
+        "position": [7.300000011920929, 7, -3.3355552948941196],
+        "facing": [-97.79812, 10.79985]
+    },
+    "sandbot": {
+        "nicknames": ["sandbot", "刷沙机", "SandBot"],
+        "dimension": "minecraft:overworld",
+        "position": [-18.46274904710065, 8, -27.7550069249873],
+        "facing": [179.55008, 6.900042]
+    },
+    "back_home": {
+        "nicknames": ["back_home", "回家", "Back_Home"],
+        "dimension": "minecraft:overworld",
+        "position": [-2.03938899965811, 7, -14.023214370232122],
+        "facing": [-154.43652, 3.9000049]
+    }
+}

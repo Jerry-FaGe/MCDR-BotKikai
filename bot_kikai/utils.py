@@ -1,12 +1,7 @@
 from mcdreforged.api.types import ServerInterface
 
-prefix_short = '!!bk'
+from bot_kikai.config import config
 
-# 操作假人(spawn,use,kill)的最低权限  guest: 0, user: 1, helper: 2, admin: 3, owner: 4
-permission_bot = 1
-
-# 操作假人列表(add,remove)的最低权限  guest: 0, user: 1, helper: 2, admin: 3, owner: 4
-permission_list = 3
 
 dimension_convert = {
     '0': 'minecraft:overworld',
@@ -35,21 +30,21 @@ help_head = """
 """
 
 help_body = {
-    f"§7{prefix_short}": "§r显示本帮助信息",
-    f"§7{prefix_short} list [online|offline]": "§r显示假人列表，可筛选在线或离线",
-    f"§7{prefix_short} reload": "§r重载插件配置",
-    f"§7{prefix_short} add <name> <kikai>": "§r使用当前玩家参数添加一个名为<name>用于<kikai>的假人",
-    f"§7{prefix_short} add <name> <kikai> <dim> <pos> <facing>": "§r使用自定义参数添加一个名为<name>用于<kikai>的假人",
-    f"§7{prefix_short} del <kikai>": "§r从假人列表移除用于<kikai>的假人",
-    f"§7{prefix_short} <kikai>": "§r输出一个可点击的界面，自动根据假人是否在线改变选项",
-    f'§7{prefix_short} <kikai> spawn': "§r召唤一个用于<kikai>的假人",
-    f"§7{prefix_short} <kikai> kill": "§r干掉用于<kikai>的假人",
-    f"§7{prefix_short} <kikai> where": "§r假人发光两分钟并输出坐标",
-    f"§7{prefix_short} <kikai> use": "§r假人右键一次",
-    f"§7{prefix_short} <kikai> huse <interval>": "§r假人持续右键，后接正整数可控制间隔 gt",
-    f"§7{prefix_short} <kikai> atk": "§r假人左键一次",
-    f"§7{prefix_short} <kikai> hatk <interval>": "§r假人持续左键, 后接正整数可控制间隔 gt",
-    f"§7{prefix_short} <kikai> stop": "§r假人停止一切动作",
+    f"§7{config.prefix_short}": "§r显示本帮助信息",
+    f"§7{config.prefix_short} list §6[online§7|§6offline]": "§r显示假人列表，可筛选在线或离线",
+    f"§7{config.prefix_short} reload": "§r重载插件配置",
+    f"§7{config.prefix_short} add §6<name> <kikai>": "§r使用当前玩家参数添加一个名为 §6<name> §r用于 §6<kikai> §r的假人",
+    f"§7{config.prefix_short} add §6<name> <kikai> <dim> <pos> <facing>": "§r使用自定义参数添加一个名为 §6<name> §r用于 §6<kikai> §r的假人",
+    f"§7{config.prefix_short} del §6<kikai>": "§r删除用于 §6<kikai> §r的假人",
+    f"§7{config.prefix_short} §6<kikai>": "§r输出用于 §6<kikai> §r的假人信息",
+    f'§7{config.prefix_short} §6<kikai> §7spawn': "§r上线用于 §6<kikai> §r的假人",
+    f"§7{config.prefix_short} §6<kikai> §7kill": "§r下线用于 §6<kikai> §r的假人",
+    f"§7{config.prefix_short} §6<kikai> §7where": "§r假人发光两分钟并输出坐标",
+    f"§7{config.prefix_short} §6<kikai> §7use": "§r假人右键一次",
+    f"§7{config.prefix_short} §6<kikai> §7huse §6[<interval>]": "§r假人持续右键，后接正整数可控制间隔 gt",
+    f"§7{config.prefix_short} §6<kikai> §7atk": "§r假人左键一次",
+    f"§7{config.prefix_short} §6<kikai> §7hatk §6[<interval>]": "§r假人持续左键, 后接正整数可控制间隔 gt",
+    f"§7{config.prefix_short} §6<kikai> §7stop": "§r假人停止一切动作",
 }
 
 

@@ -3,7 +3,7 @@ import time
 from mcdreforged.api.types import PluginServerInterface, ServerInterface
 from mcdreforged.api.rtext import RText, RTextList, RAction
 
-from . import utils
+from .config import config
 
 
 class Bot:
@@ -57,9 +57,8 @@ class Bot:
         if not self.is_online:
             self.spawn(executor=executor)
             
-            # TODO 考虑独立配置文件
-            max_wait_time = 10  # 自动上线等待时间
-            wait_interval = 0.5  # 自动上线检查间隔
+            max_wait_time = config.spawn_max_wait_time
+            wait_interval = config.spawn_check_interval
             waited_time = 0
             
             while not self.is_online and waited_time < max_wait_time:
@@ -128,21 +127,21 @@ class Bot:
         special_rtext = RTextList()
         if self.is_online:
             special_rtext.append(
-                RText('§4[下线] ').c(RAction.suggest_command, f'{utils.prefix_short} {self.name} kill').h(f'下线 §6{self.name}'),
-                RText('§b[停止] ').c(RAction.suggest_command, f'{utils.prefix_short} {self.name} stop').h(f'§6{self.name} §7停止所有动作'),
+                RText('§4[下线] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} kill').h(f'下线 §6{self.name}'),
+                RText('§b[停止] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} stop').h(f'§6{self.name} §7停止所有动作'),
             )
         else:
             special_rtext.append(
-                RText('§a[上线] ').c(RAction.suggest_command, f'{utils.prefix_short} {self.name} spawn').h(f'召唤 §6{self.name}'),
+                RText('§a[上线] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} spawn').h(f'召唤 §6{self.name}'),
             )
 
         return RTextList(
             special_rtext,
-            RText('§b[报点] ').c(RAction.suggest_command, f'{utils.prefix_short} {self.name} where').h(f'§6{self.name} §7发光两分钟并输出坐标'),
-            RText('§b[右键] ').c(RAction.suggest_command, f'{utils.prefix_short} {self.name} use').h(f'§6{self.name} §7右键一次'),
-            RText('§b[持续右键] ').c(RAction.suggest_command, f'{utils.prefix_short} {self.name} huse ').h(f'§6{self.name} §7持续右键，后接正整数可控制间隔 gt'),
-            RText('§b[左键] ').c(RAction.suggest_command, f'{utils.prefix_short} {self.name} atk').h(f'§6{self.name} §7左键一次'),
-            RText('§b[持续左键] ').c(RAction.suggest_command, f'{utils.prefix_short} {self.name} hatk ').h(f'§6{self.name} §7持续左键，后接正整数可控制间隔 gt'),
+            RText('§b[报点] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} where').h(f'§6{self.name} §7发光两分钟并输出坐标'),
+            RText('§b[右键] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} use').h(f'§6{self.name} §7右键一次'),
+            RText('§b[持续右键] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} huse ').h(f'§6{self.name} §7持续右键，后接正整数可控制间隔 gt'),
+            RText('§b[左键] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} atk').h(f'§6{self.name} §7左键一次'),
+            RText('§b[持续左键] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} hatk ').h(f'§6{self.name} §7持续左键，后接正整数可控制间隔 gt'),
         )
 
     def get_info_rtext(self) -> RTextList:

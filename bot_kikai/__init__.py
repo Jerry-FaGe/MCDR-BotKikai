@@ -1,5 +1,6 @@
 from mcdreforged.api.types import PluginServerInterface, Info
 
+from .config import config
 from .bot_manager import BotManager
 from .command import register_command_tree
 
@@ -8,6 +9,10 @@ bot_manager_instance: BotManager | None = None
 
 
 def on_load(server: PluginServerInterface, old):
+    # 初始化配置
+    config.init(server)
+
+    # 初始化假人管理器
     global bot_manager_instance
     bot_manager_instance = BotManager(server)
     
