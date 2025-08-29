@@ -1,125 +1,172 @@
 # MCDR-BotKikai（Bot機械）
 
-适用于 [MCDR](https://github.com/Fallen-Breath/MCDReforged) 的将假人存储至列表并提供指令映射，便捷放置，操作界面等功能的插件。
-需要安装前置插件 [MinecraftDataAPI](https://github.com/MCDReforged/MinecraftDataAPI) 。
+一个基于 [MCDR](https://github.com/Fallen-Breath/MCDReforged) 的 Minecraft 假人管理插件，专注于简化 Carpet 假人的管理和操作。
 
-> 君は道具ではなく、その名が似合う人になろんだ
+> 君は道具ではなく、その名が似合う人になろんだ  
 
-此插件本意是为了方便记性不好记不住每个机器的挂机假人名字和英文不好的玩家，使其可以用中文操作某机器对应的假人（觉得聊天框中文不好打的甚至可以用拼音）。
+## 📝 简介
 
-假如你有一台刷沙机, 开关在 [0, 64, 0] 的位置。本插件可以实现让你在世界的任何位置输入指令 `!!bk 刷沙机 use` 都可以随时在指定位置召唤假人以开关这台刷沙机（顺便挂机）。
+本插件旨在解决以下问题：
 
-```Minecraft
-!!bk: 显示本帮助信息
-!!bk list [online|offline]: 显示假人列表，可筛选在线或离线
-!!bk reload: 重载插件配置
-!!bk add <name> <kikai>: 使用当前玩家参数添加一个名为<name>用于<kikai>的假人
-!!bk add <name> <kikai> <dim> <pos> <facing>: 使用自定义参数添加一个名为<name>用于<kikai>的假人
-!!bk del <kikai>: 从假人列表移除用于<kikai>的假人
-!!bk <kikai>: 输出一个可点击的界面，自动根据假人是否在线改变选项
-!!bk <kikai> spawn: 召唤一个用于<kikai>的假人
-!!bk <kikai> kill: 干掉用于<kikai>的假人
-!!bk <kikai> where: 假人发光两分钟并输出坐标
-!!bk <kikai> use: 假人右键一次
-!!bk <kikai> huse <interval>: 假人持续右键，后接正整数可控制间隔 gt
-!!bk <kikai> atk: 假人左键一次
-!!bk <kikai> hatk <interval>: 假人持续左键, 后接正整数可控制间隔 gt
-!!bk <kikai> stop: 假人停止一切动作
+- 记不住每个机器的假人名字？
+- 不习惯输入英文指令？
+- 想在家里快速开关远处、其他维度的机器？
+
+只需为每个假人设置中文别名，就能通过简单的中文名字来操控它们。比如，对于一个叫 `SandBot` 的假人，你可以给它起个别名叫"刷沙机"，这样 `!!bk SandBot spawn` 和 `!!bk 刷沙机 spawn` 的效果是完全一样的！也就是说你不需要记住哪个假人控制哪个机器，只需要确认你想开关哪个机器。
+
+你可以在世界的任意位置输入指令 `!!bk 刷沙机 use` 即可让假人 `SandBot` 自动在刷沙机处上线，并右键开关来开启刷沙机（顺便挂机）。
+
+> 上古版本的[介绍视频](https://www.bilibili.com/video/BV1Rf4y1C776) By: [Nachuan川川](https://space.bilibili.com/107251863)
+
+## 🚀 特性
+
+- 支持假人别名系统（中文、拼音等都可以）
+- 方便的假人位置和朝向记录
+- 交互式的操作界面
+- 支持权限管理
+- 配置文件热重载
+
+## ⚙️ 依赖
+
+- [MCDReforged](https://github.com/Fallen-Breath/MCDReforged) >= 2.0.0
+- [MinecraftDataAPI](https://github.com/Fallen-Breath/MinecraftDataAPI) >= 1.1.0
+- Minecraft 服务端需要安装 [Carpet](https://github.com/gnembon/fabric-carpet) 模组
+
+## 📖 命令说明
+
+基础命令（可于配置文件中自定义）：
+
+```minecraft
+!!bk
 ```
 
-## 功能补充
-* 参数中的 `<kikai>` 指红石机械，`<name>` 指假人的真实名字。
+所有可用命令：
 
-    如果想让 `SandBot` 控制 `刷沙机`，则 `<name>` 为 `SandBot`，`<kikai>` 为 `刷沙机`。
+| 命令 | 说明 | 权限等级 |
+|------|------|----------|
+| !!bk | 显示帮助信息 | 所有人 |
+| !!bk list <online\|offline> | 显示假人列表，可筛选在线或离线 | 所有人 |
+| !!bk reload | 重载插件配置 | admin |
+| !!bk add <name\> <kikai\> | 使用当前玩家位置添加假人 | admin |
+| !!bk add <name\> <kikai\> [dim] [pos] [facing] | 使用自定义参数添加假人 | admin |
+| !!bk del <kikai\> | 删除指定假人 | admin |
+| !!bk <kikai\> | 显示假人详细信息和操作界面 | user |
 
-    假人器械映射，顾名思义，`!!bk SandBot spawn` 和 `!!bk 刷沙机 spawn` 的运作效果是一样的，其他指令同理。
+假人操作命令：
 
-    `<name>` 应该为 MC 中所存在的玩家名。
-    
-* 本插件支持MCDR的权限系统，可以在 `utils.py` 文件修改使用指令的权限等级。
+| 命令 | 说明 | 权限等级 |
+|------|------|----------|
+| !!bk <kikai\> spawn | 在对应位置生成假人 | user |
+| !!bk <kikai\> kill | 移除假人 | user |
+| !!bk <kikai\> where | 显示假人位置（会让假人发光2分钟） | user |
+| !!bk <kikai\> use | 假人右键一次 | user |
+| !!bk <kikai\> huse [<interval\>] | 假人持续右键，可选间隔时间（gt） | user |
+| !!bk <kikai\> atk | 假人左键一次 | user |
+| !!bk <kikai\> hatk [<interval\>] | 假人持续左键，可选间隔时间（gt） | user |
+| !!bk <kikai\> stop | 停止假人的所有动作 | user |
 
-    默认的权限配置为：
-    * user 及以上组可以操作假人 (spawn, use ,kill)
-    * admin 及以上组可以操作假人列表 (add, remove)
+## ⚡ 快速上手
 
-* `!!bk list`: 输出一个类似下面的界面，不带参数可以显示本插件储存的所有假人，带上 `online/offline` 参数可以单独显示当前在线或离线的假人，可以通过点击进行操作。
-  ```Minecraft
-  ----------- Jerry_FaGe 在线 -----------
-  此假人用于: 发哥, 开发者, test
-  [下线] [停止] [报点] [右键] [持续右键] [左键] [持续左键] 
-  
-  ----------- SandBot 在线 -----------
-  此假人用于: 刷沙机, shuashaji
-  [下线] [停止] [报点] [右键] [持续右键] [左键] [持续左键] 
-  
-  ----------- Stonebot 离线 -----------
-  此假人用于: 刷石机, shuashiji
-  [上线] [报点] [右键] [持续右键] [左键] [持续左键]
-  ```
-* `!!bk reload`: 重载 [config.json](https://github.com/Jerry-FaGe/MCDR-BotKikai/blob/master/config.json) 配置文件，用于用户修改配置。配置文件详见下文 **关于配置文件**。
+1. 为刷沙机添加一个假人并设置位置：
 
-* `!!bk add <name> <kikai>`: 使用玩家当前的维度，坐标，朝向添加一个假人。也就是说如果玩家用准星指着开关使用此指令后，召唤出的假人可以直接 use 开关。如果想修改当前存在的假人信息可以直接重新 add ，只要假人名字一样新 add 的信息会覆盖旧的。
-  
-    **注:** 由于 carpet 本身原因，假人无法 use 拉杆（也不一定，我在新版本测试是能用的），如果机器的开关是拉杆形式的请自行替换成音符盒式或其他支持假人 use 的方式。
-
-* `!!bk add <name> <kikai> <dim> <pos> <facing>`: 使用指令中的自定义参数添加一个假人，可用作挂机点等对假人朝向没有要求的场景。
-
-* `!!bk <kikai>`: 输出一个可点击的界面，自动根据假人是否在线改变选项
-  * 假人在线:
-    ```Minecraft
-    ----------- SandBot 在线 -----------
-    用于: 刷沙机, shuashaji
-    维度: minecraft:overworld
-    坐标: [-2.439826988598193, 7.0, -5.05480960268401]
-    朝向: [180.59103, 29.550417]
-    [下线] [停止] [报点] [右键] [持续右键] [左键] [持续左键]
-    ```
-  * 假人离线:
-    ```Minecraft
-    ----------- Stonebot 离线 -----------
-    用于: 刷石机, shuashiji
-    维度: minecraft:overworld
-    坐标: [4.589996529809662, 7.0, -4.426900981652432]
-    朝向: [-214.02008, 31.20023]
-    [上线] [报点] [右键] [持续右键] [左键] [持续左键]
+    ```minecraft
+    !!bk add SandBot 刷沙机
     ```
 
-## 关于配置文件
+    玩家站在期望的位置和朝向执行此命令，假人的位置和朝向会被自动记录。
 
-配置文件 [config.json](https://github.com/Jerry-FaGe/MCDR-BotKikai/blob/master/config.json) 是一个json格式文件。它一般储存在 `MCDR/config/bot_kikai` 文件夹下，如果想实现上文中的效果，它的格式应该如下：
+    你也可以手动指定位置（不建议，挺麻烦的）：
 
-```JSON
-{
-    "Jerry_FaGe": {
-        "nicknames": ["Jerry_FaGe", "发哥", "开发者", "test"],
-        "dimension": "minecraft:overworld",
-        "position": [0, 70, 0],
-        "facing": [0, 0]
-    },
-    "SandBot": {
-        "nicknames": ["SandBot", "刷沙机"],
-        "dimension": "minecraft:overworld",
-        "position": [-2.439826988598193, 7.0, -5.05480960268401],
-        "facing": [180.59103, 29.550417]
-    },
-    "Stonebot": {
-        "nicknames": ["Stonebot", "刷石机"],
-        "dimension": "minecraft:overworld",
-        "position": [4.589996529809662, 7.0, -4.426900981652432],
-        "facing": [-214.02008, 31.20023]
+    ```minecraft
+    !!bk add SandBot 刷沙机 minecraft:overworld 0 64 0 -154.43 3.90
+    ```
+
+2. 使用假人：
+
+    ```minecraft
+    !!bk 刷沙机           # 显示假人信息和操作界面
+    !!bk 刷沙机 spawn     # 召唤假人到记录的位置
+    !!bk 刷沙机 use       # 让假人右键一次
+    !!bk 刷沙机 hatk 12   # 让假人每 12gt 左键一次
+    !!bk 刷沙机 stop      # 让假人停止动作
+    !!bk 刷沙机 kill      # 让假人下线
+    ```
+
+## ⚙️ 配置文件
+
+插件会在 `MCDR/config/bot_kikai` 目录下创建两个配置文件：
+
+1. `config.json` - 插件基础配置：
+
+    ```json
+    {
+        "prefix_short": "!!bk",
+        "spawn_max_wait_time": 10.0,
+        "spawn_check_interval": 0.5,
+        "permission": {
+            "bot": 1,
+            "list": 3
+        }
     }
-}
-```
+    ```
 
-除了使用`add`, `del`指令操作假人列表外，用户还可以根据配置文件的格式自行增删改，改完之后去游戏中执行`!!bk reload`即可更新修改后的假人列表。
+    配置项说明：
 
-## 声明
+    - prefix_short: 命令前缀
+    - spawn_max_wait_time: 等待假人生成的最大时间（秒）
+    - spawn_check_interval: 检查假人是否生成的间隔（秒）
+    - permission.bot: 操作假人的最低权限等级
+    - permission.list: 管理假人的最低权限等级
+
+2. `bots.json` - 假人数据：
+
+    ```json
+    {
+        "SandBot": {
+            "nicknames": ["SandBot", "刷沙机", "shuashaji"],
+            "dimension": "minecraft:overworld",
+            "position": [-2.44, 7.0, -5.05],
+            "facing": [180.59, 29.55]
+        }
+    }
+    ```
+
+    配置项说明：
+
+    - nicknames: 假人的所有别名列表
+    - dimension: 假人所在维度
+    - position: 假人的位置坐标 [x, y, z]
+    - facing: 假人的朝向角度 [水平角, 垂直角]
+
+## 🔒 权限系统
+
+插件使用 MCDR 的[权限](https://docs.mcdreforged.com/zh-cn/latest/permission.html#permission-file)系统，默认配置：
+
+- 假人操作权限（spawn、use、kill 等）：需要 user 及以上权限
+- 假人管理权限（add、remove 等）：需要 admin 及以上权限
+
+权限等级对应关系：
+
+- guest = 0
+- user = 1
+- helper = 2
+- admin = 3
+- owner = 4
+
+## 📝 注意事项
+
+- 对于某些版本的 Carpet 模组，假人可能无法操作拉杆，建议替换成音符盒式开关或其他支持假人右键的方式。
+
+## ⚠️ 声明
 
 本插件实现的功能只要是装了 Carpet Mod 能召唤假人的服务端都可以实现，即便是这样也仍有可能引发**不香草**争议。烦请想装本插件的腐竹实装前务必了解下成员们的意愿。
 
-特别感谢 [AnzhiZhang](https://github.com/AnzhiZhang) 的 [Bot](https://github.com/AnzhiZhang/MCDReforgedPlugins/tree/master/src/bot) 插件提供的部分逻辑。
+## 🤝 致谢
 
-TODO:
-- [x] 分开显示离线和在线假人
-- [x] 修复部分操作下指令无反馈
-- [ ] 将权限配置文件化
+- 感谢 [Fallen_Breath](https://github.com/Fallen-Breath) 开发的 [MCDR](https://github.com/Fallen-Breath/MCDReforged) 框架
+- 感谢 [Carpet](https://github.com/gnembon/fabric-carpet) 模组提供的假人功能
+- 感谢 [AnzhiZhang](https://github.com/AnzhiZhang) 的 [Bot](https://github.com/AnzhiZhang/MCDReforgedPlugins/tree/master/src/bot) 插件提供的灵感
+
+## 📄 开源协议
+
+[GPL-3.0 License](LICENSE)
