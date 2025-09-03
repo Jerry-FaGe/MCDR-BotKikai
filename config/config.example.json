@@ -2,6 +2,8 @@
     "prefix_short": "!!bk",
     "spawn_max_wait_time": 10.0,
     "spawn_check_interval": 0.5,
+    "bot_name_prefix": "",
+    "bot_name_suffix": "",
     "permission": {
         "bot": 1,
         "list": 3

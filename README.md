@@ -1,6 +1,6 @@
 # MCDR-BotKikai（Bot機械）
 
-一个基于 [MCDR](https://github.com/Fallen-Breath/MCDReforged) 的 Minecraft 假人管理插件，专注于简化 Carpet 假人的管理和操作。
+一个基于 [MCDR](https://github.com/Fallen-Breath/MCDReforged) 的 Minecraft 假人管理插件，专注于简化 [Carpet](https://github.com/gnembon/fabric-carpet) 假人的管理和操作。
 
 > 君は道具ではなく、その名が似合う人になろんだ  
 
@@ -23,6 +23,7 @@
 - 支持假人别名系统（中文、拼音等都可以）
 - 方便的假人位置和朝向记录
 - 交互式的操作界面
+- 支持假人前后缀
 - 支持权限管理
 - 配置文件热重载
 
@@ -45,7 +46,7 @@
 | 命令 | 说明 | 权限等级 |
 |------|------|----------|
 | !!bk | 显示帮助信息 | 所有人 |
-| !!bk list <online\|offline> | 显示假人列表，可筛选在线或离线 | 所有人 |
+| !!bk list [online\|offline] | 显示假人列表，可筛选在线或离线 | 所有人 |
 | !!bk reload | 重载插件配置 | admin |
 | !!bk add <name\> <kikai\> | 使用当前玩家位置添加假人 | admin |
 | !!bk add <name\> <kikai\> [dim] [pos] [facing] | 使用自定义参数添加假人 | admin |
@@ -103,6 +104,8 @@
         "prefix_short": "!!bk",
         "spawn_max_wait_time": 10.0,
         "spawn_check_interval": 0.5,
+        "bot_name_prefix": "",
+        "bot_name_suffix": "",
         "permission": {
             "bot": 1,
             "list": 3
@@ -115,6 +118,8 @@
     - prefix_short: 命令前缀
     - spawn_max_wait_time: 等待假人生成的最大时间（秒）
     - spawn_check_interval: 检查假人是否生成的间隔（秒）
+    - bot_name_prefix: 在 Carpet 中设置的假人前缀
+    - bot_name_suffix: 在 Carpet 中设置的假人后缀
     - permission.bot: 操作假人的最低权限等级
     - permission.list: 管理假人的最低权限等级
 
@@ -155,6 +160,9 @@
 
 ## 📝 注意事项
 
+- **关于前后缀配置**：
+  - 如果服务器开启了假人前后缀，请务必在本插件配置文件中配置相同的前后缀，以防止预期之外的情况发生；
+  - 如果服务器没有开启假人前后缀，您依然可以配置本插件的前后缀，这样由本插件创建的假人都会带有配置的前后缀。
 - 对于某些版本的 Carpet 模组，假人可能无法操作拉杆，建议替换成音符盒式开关或其他支持假人右键的方式。
 
 ## ⚠️ 声明

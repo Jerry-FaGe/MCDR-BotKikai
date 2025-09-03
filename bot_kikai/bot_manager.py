@@ -67,6 +67,14 @@ class BotManager:
                 return bot
         return None
 
+    def get_bot_by_real_name(self, real_name: str) -> Bot | None:
+        """通过假人的真实游戏名（带前后缀）查找 Bot 对象"""
+        real_name_lower = real_name.lower()
+        for bot in self.bots.values():
+            if bot.real_name.lower() == real_name_lower:
+                return bot
+        return None
+
     def get_all_bots(self) -> list[Bot]:
         return list(self.bots.values())
 
@@ -89,11 +97,3 @@ class BotManager:
     def clear_all_online_status(self):
         for bot in self.bots.values():
             bot.is_online = False
-
-    def auth_player(self, player_name: str) -> str | None:
-        """检查一个玩家名是否属于已配置的假人，返回其主名"""
-        lower_name = player_name.lower()
-        for bot in self.bots.values():
-            if bot.name.lower() == lower_name:
-                return bot.name
-        return None

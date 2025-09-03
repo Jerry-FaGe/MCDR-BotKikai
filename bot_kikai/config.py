@@ -15,6 +15,10 @@ class Config:
     spawn_max_wait_time: float = 10.0  # 最大等待时间（秒）
     spawn_check_interval: float = 0.5  # 检查间隔（秒）
 
+    # Carpet 假人前后缀
+    bot_name_prefix: str = ''  # 假人名称前缀
+    bot_name_suffix: str = ''  # 假人名称后缀
+
     # 权限配置  guest: 0, user: 1, helper: 2, admin: 3, owner: 4
     permission: Dict[str, int] = field(default_factory=lambda: {
         'bot': 1,  # 操作假人(spawn,use,kill)的最低权限
@@ -95,6 +99,8 @@ class Config:
             'prefix_short': self.prefix_short,
             'spawn_max_wait_time': self.spawn_max_wait_time,
             'spawn_check_interval': self.spawn_check_interval,
+            'bot_name_prefix': self.bot_name_prefix,
+            'bot_name_suffix': self.bot_name_suffix,
             'permission': self.permission
         }
         

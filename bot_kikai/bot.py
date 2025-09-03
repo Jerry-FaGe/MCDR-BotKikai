@@ -16,6 +16,12 @@ class Bot:
         self.facing = facing
         self.is_online = False
 
+    @property
+    def real_name(self) -> str:
+        """根据全局配置动态计算假人在游戏中的真实名称"""
+        base_name = self.name.lower()
+        return f"{config.bot_name_prefix}{base_name}{config.bot_name_suffix}"
+
     # --- 核心动作 ---
 
     def spawn(self, executor: str | None = None, pos=None, dim=None, facing=None):
@@ -34,7 +40,7 @@ class Bot:
         pos_str = ' '.join(map(str, spawn_pos))
         facing_str = ' '.join(map(str, spawn_facing))
         
-        base_command = f'player {self.name} spawn at {pos_str} facing {facing_str} in {spawn_dim}'
+        base_command = f'player {self.real_name} spawn at {pos_str} facing {facing_str} in {spawn_dim}'
         
         if executor:
             final_command = f'execute as {executor} run {base_command}'
@@ -46,12 +52,12 @@ class Bot:
 
     def kill(self):
         """下线假人"""
-        self.server.execute(f'player {self.name} kill')
+        self.server.execute(f'player {self.real_name} kill')
         return True
 
     def stop(self):
         """停止假人的所有动作"""
-        self.server.execute(f'player {self.name} stop')
+        self.server.execute(f'player {self.real_name} stop')
 
     def _ensure_online(self, executor: str | None = None):
         if not self.is_online:
@@ -77,7 +83,7 @@ class Bot:
             action = f'use continuous' if interval <= 0 else f'use interval {interval}'
         else:
             action = 'use once'
-        self.server.execute(f'player {self.name} {action}')
+        self.server.execute(f'player {self.real_name} {action}')
 
     def attack(self, continuous: bool = False, interval: int = 0, executor: str | None = None):
         """让假人执行“攻击”（左键）动作"""
@@ -86,14 +92,14 @@ class Bot:
             action = f'attack continuous' if interval <= 0 else f'attack interval {interval}'
         else:
             action = 'attack once'
-        self.server.execute(f'player {self.name} {action}')
+        self.server.execute(f'player {self.real_name} {action}')
 
     # --- 状态与效果 ---
 
     def glowing(self, duration_sec: int = 120, amplifier: int = 0, executor: str | None = None):
         """为假人应用发光效果"""
         self._ensure_online(executor)
-        self.server.execute(f'effect give {self.name} glowing {duration_sec} {amplifier}')
+        self.server.execute(f'effect give {self.real_name} glowing {duration_sec} {amplifier}')
 
     # --- 数据转换 ---
 
@@ -145,7 +151,7 @@ class Bot:
         )
 
     def get_info_rtext(self) -> RTextList:
-        nickname_ls = list(filter(lambda x: x.lower() != self.name.lower(), self.nicknames))
+        nickname_ls = list(filter(lambda x: x.lower() not in [self.name.lower(), self.real_name.lower()], self.nicknames))
         nickname = ", ".join(nickname_ls)
         online_status = '§a在线' if self.is_online else '§4离线'
         return RTextList(
@@ -158,7 +164,7 @@ class Bot:
         )
     
     def get_simple_rtext(self) -> RTextList:
-        nickname_ls = list(filter(lambda x: x.lower() != self.name.lower(), self.nicknames))
+        nickname_ls = list(filter(lambda x: x.lower() not in [self.name.lower(), self.real_name.lower()], self.nicknames))
         nickname = ", ".join(nickname_ls)
         online_status = '§a在线' if self.is_online else '§4离线'
         return RTextList(
