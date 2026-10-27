@@ -1,2 +1,2 @@
-mcdreforged>=2.0.0
+mcdreforged>=2.12.0
 pytest>=8,<10

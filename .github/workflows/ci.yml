@@ -34,7 +34,7 @@ jobs:
         include:
           - os: ubuntu-latest
             python: '3.10'
-            mcdr: '2.0.0'
+            mcdr: '2.12.0'
             package: false
           - os: ubuntu-latest
             python: '3.14'
@@ -83,9 +83,6 @@ jobs:
           MCDR_VERSION: ${{ matrix.mcdr }}
         run: |
           packages=("mcdreforged==$MCDR_VERSION" 'pytest>=8,<10')
-          if [[ "$MCDR_VERSION" == '2.0.0' ]]; then
-            packages+=('setuptools<81' 'ruamel.yaml<0.18')
-          fi
           if [[ -f requirements-dev.txt ]]; then
             packages+=(-r requirements-dev.txt)
           fi

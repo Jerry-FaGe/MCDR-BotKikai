@@ -32,11 +32,11 @@
 ## ⚙️ 依赖
 
 - Python >= 3.10
-- [MCDReforged](https://github.com/Fallen-Breath/MCDReforged) >= 2.0.0
-- [MinecraftDataAPI](https://github.com/Fallen-Breath/MinecraftDataAPI) >= 1.1.0
+- [MCDReforged](https://github.com/Fallen-Breath/MCDReforged) >= 2.12.0
+- [MinecraftDataAPI](https://github.com/Fallen-Breath/MinecraftDataAPI) >= 1.6.2
 - Minecraft 服务端需要安装 [Carpet](https://github.com/gnembon/fabric-carpet) 模组
 
-推荐使用 MCDR 2.16.2 和 MinecraftDataAPI 1.6.2。插件不要求开启 RCON。
+推荐使用 MCDR 2.16.2 和 MinecraftDataAPI 1.6.2；旧环境升级时请先更新上述依赖。插件不要求开启 RCON。
 
 ## 📖 命令说明
 
@@ -198,7 +198,7 @@ python -m pytest -q
 python -m mcdreforged pack
 ```
 
-回归测试覆盖配置保护、并发保存、在线状态同步、召唤超时、生命周期取消及命令解析。CI 矩阵覆盖最低支持的 MCDR 2.0.0 和 MCDR 2.16.2，并在发布打包前运行测试；它们不替代实际 Minecraft/Carpet 环境中的验证。
+回归测试覆盖配置保护、并发保存、在线状态同步、召唤超时、生命周期取消及命令解析。CI 矩阵覆盖最低支持的 MCDR 2.12.0 和 MCDR 2.16.2，并在发布打包前运行测试；它们不替代实际 Minecraft/Carpet 环境中的验证。
 
 ## ⚠️ 声明
 

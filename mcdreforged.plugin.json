@@ -9,8 +9,8 @@
 	"link": "https://github.com/Jerry-FaGe/MCDR-BotKikai",
 	"dependencies": {
 		"python": ">=3.10",
-		"mcdreforged": ">=2.0.0",
-		"minecraft_data_api": ">=1.1.0"
+		"mcdreforged": ">=2.12.0",
+		"minecraft_data_api": ">=1.6.2"
 	},
 	"resources": [
 		"LICENSE"

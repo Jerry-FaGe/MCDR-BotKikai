@@ -15,12 +15,12 @@ from bot_kikai.storage import write_json
 
 
 def run_command(root, source, text):
-    if hasattr(root, '_entry_execute'):
+    executions = root._entry_execute(source, text)
+    # MCDR 2.12 executes callbacks inline; 2.16.2 returns scheduled callbacks.
+    if executions is not None:
         from mcdreforged.command.builder.callback import DirectCallbackInvoker
-        for execution in root._entry_execute(source, text):
+        for execution in executions:
             execution.scheduled_callback.invoke(DirectCallbackInvoker())
-    else:
-        root.execute(source, text)
 
 
 def test_command_tree_add_list_delete(env):
