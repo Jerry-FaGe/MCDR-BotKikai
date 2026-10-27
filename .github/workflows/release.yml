@@ -1,4 +1,4 @@
-name: 🔖 Release BotKikai .mcdr
+name: Release
 
 on:
   push:
@@ -6,41 +6,67 @@ on:
       - 'v*.*.*'
 
 permissions:
-  contents: write  # 必需权限，用于创建/更新 Release
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build_and_release:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: ci
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
 
     steps:
-      - name: 🔄 Checkout code
-        uses: actions/checkout@v3
-
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
+      - name: Checkout release history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: '3.10'
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: 📦 Install MCDReforged CLI
-        run: pip install mcdreforged
-
-      - name: 📤 Pack plugin
-        run: |
-          python -m mcdreforged pack
-
-      - name: 📑 Generate Release Notes
-        id: build_changelog
-        uses: mikepenz/release-changelog-builder-action@v5
+      - name: Download verified package
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          mode: "COMMIT"
+          name: bot-kikai-${{ github.sha }}
+          path: dist
 
-      - name: 📣 Publish Release & Upload Asset
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: '*.mcdr'
-          body: ${{ steps.build_changelog.outputs.changelog }}
-          fail_on_unmatched_files: true
+      - name: Verify checksum and identify prerelease
+        id: verify
+        working-directory: dist
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          sha256sum --check --strict SHA256SUMS
+          if [[ "${RELEASE_TAG%%+*}" == *-* ]]; then
+            echo 'prerelease=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'prerelease=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate commit-based release notes
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@aa013739bbc8e7067dbbecd4525ff11aeb51a84b # v6.4.0
+        with:
+          mode: COMMIT
+          offlineMode: true
+          toTag: ${{ github.ref_name }}
+          failOnError: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/*.mcdr
+            dist/SHA256SUMS
+          body: ${{ steps.changelog.outputs.changelog }}
+          prerelease: ${{ steps.verify.outputs.prerelease == 'true' }}
+          make_latest: ${{ steps.verify.outputs.prerelease == 'true' && 'false' || 'legacy' }}
+          fail_on_unmatched_files: true

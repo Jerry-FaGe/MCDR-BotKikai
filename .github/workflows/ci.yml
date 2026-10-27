@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A reusable workflow inherits github.workflow from its caller.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONUTF8: '1'
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+
+jobs:
+  check:
+    name: Python ${{ matrix.python }} / MCDR ${{ matrix.mcdr }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.10'
+            mcdr: '2.0.0'
+            package: false
+          - os: ubuntu-latest
+            python: '3.14'
+            mcdr: '2.16.2'
+            package: true
+          - os: windows-latest
+            python: '3.10'
+            mcdr: '2.16.2'
+            package: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            requirements-dev.txt
+
+      - name: Check source syntax and release version
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          metadata = json.loads(Path('mcdreforged.plugin.json').read_text(encoding='utf-8'))
+          tag = os.environ['RELEASE_TAG']
+          if tag and tag != f"v{metadata['version']}":
+              raise SystemExit(f"Tag {tag!r} does not match metadata version {metadata['version']!r}")
+          sources = list(Path('bot_kikai').rglob('*.py'))
+          if not sources:
+              raise SystemExit('No plugin source files found')
+          for source in sources:
+              compile(source.read_bytes(), str(source), 'exec')
+          for example in Path('config').glob('*.json'):
+              json.loads(example.read_text(encoding='utf-8'))
+          print(f"Checked {len(sources)} Python files, example JSON and plugin version {metadata['version']}")
+          PY
+
+      - name: Install test dependencies
+        env:
+          MCDR_VERSION: ${{ matrix.mcdr }}
+        run: |
+          packages=("mcdreforged==$MCDR_VERSION" 'pytest>=8,<10')
+          if [[ "$MCDR_VERSION" == '2.0.0' ]]; then
+            packages+=('setuptools<81' 'ruamel.yaml<0.18')
+          fi
+          if [[ -f requirements-dev.txt ]]; then
+            packages+=(-r requirements-dev.txt)
+          fi
+          python -m pip install "${packages[@]}"
+
+      - name: Run regression tests
+        run: |
+          if [[ -d tests ]]; then
+            python -m pytest -q
+          elif [[ -f pytest.ini || -f requirements-dev.txt ]]; then
+            echo '::error::Test configuration exists, but the tests directory is missing.'
+            exit 1
+          else
+            echo '::notice::No test suite in this revision; source and package checks still run.'
+            echo 'Regression tests: not yet present in this revision.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Build and verify plugin archive
+        if: matrix.package
+        run: |
+          python -m mcdreforged pack --input . --output dist
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          packages = list(Path('dist').glob('*.mcdr'))
+          if len(packages) != 1:
+              raise SystemExit(f'Expected exactly one plugin archive, found {len(packages)}')
+          package = packages[0]
+          expected = {'mcdreforged.plugin.json', 'LICENSE'}
+          expected.update(path.as_posix() for path in Path('bot_kikai').rglob('*.py'))
+          with ZipFile(package) as archive:
+              files = [info.filename for info in archive.infolist() if not info.is_dir()]
+              if set(files) != expected or len(files) != len(expected):
+                  raise SystemExit(f'Unexpected archive contents: {files}')
+              for name in files:
+                  if archive.read(name) != Path(name).read_bytes():
+                      raise SystemExit(f'Archive does not match source: {name}')
+          digest = hashlib.sha256(package.read_bytes()).hexdigest()
+          Path('dist/SHA256SUMS').write_text(f'{digest}  {package.name}\n', encoding='utf-8', newline='\n')
+          print(f'Verified {package}: {digest}')
+          PY
+
+      - name: Upload verified package
+        if: matrix.package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bot-kikai-${{ github.sha }}
+          path: |
+            dist/*.mcdr
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+          overwrite: true
