@@ -1,124 +1,180 @@
+import math
+import re
+import threading
 import time
 
 from mcdreforged.api.types import PluginServerInterface, ServerInterface
 from mcdreforged.api.rtext import RText, RTextList, RAction
 
-from .config import config
+from .config import Config, config, is_finite_number
 
 
 class Bot:
-    def __init__(self, server: PluginServerInterface | ServerInterface, name: str, nicknames: list[str], dimension: str, position: list[float], facing: list[float]):
+    def __init__(self, server: PluginServerInterface | ServerInterface, name: str, nicknames: list[str], dimension: str, position: list[float], facing: list[float], settings: Config | None = None):
+        settings = settings or config
+        if not isinstance(name, str) or re.fullmatch(r'[A-Za-z0-9_]{1,16}', name) is None:
+            raise ValueError('假人名称只能包含 1 到 16 个英文字母、数字或下划线')
         self.server = server
         self.name = name
-        self.nicknames = nicknames if nicknames is not None else [name]
+        self._real_name = f'{settings.bot_name_prefix}{name.lower()}{settings.bot_name_suffix}'
+        if re.fullmatch(r'[A-Za-z0-9_]{3,16}', self._real_name) is None:
+            raise ValueError(f'{name}: 加上前后缀后的游戏名必须是 3 到 16 个英文字母、数字或下划线')
+        if not isinstance(nicknames, list) or not all(
+            isinstance(nick, str) and nick and not any(
+                ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in nick
+            ) for nick in nicknames
+        ):
+            raise ValueError(f'{name}: nicknames 必须是非空、无空白字符的字符串列表')
+        self.nicknames = list(dict.fromkeys([name, *nicknames]))
+        if type(dimension) is int:
+            dimension = {0: 'minecraft:overworld', -1: 'minecraft:the_nether', 1: 'minecraft:the_end'}.get(dimension)
+        if not isinstance(dimension, str) or re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9_./-]+', dimension) is None:
+            raise ValueError(f'{name}: dimension 必须是有效的命名空间维度 ID')
         self.dimension = dimension
-        self.position = position
-        self.facing = facing
-        self.is_online = False
+        self.position = self._vector(position, 3, 'position')
+        self.facing = self._vector(facing, 2, 'facing')
+        self._state = threading.Condition()
+        self._action_lock = threading.RLock()
+        self._online = False
+        self._cancelled = False
+
+    @staticmethod
+    def _vector(values, length: int, field: str) -> list[float]:
+        if isinstance(values, str):
+            try:
+                values = [float(value) for value in values.split()]
+            except ValueError as error:
+                raise ValueError(f'{field} 包含无效数值') from error
+        if not isinstance(values, (list, tuple)) or len(values) != length or not all(
+            is_finite_number(value) for value in values
+        ):
+            raise ValueError(f'{field} 必须包含 {length} 个有限数值')
+        return [float(value) for value in values]
 
     @property
     def real_name(self) -> str:
-        """根据全局配置动态计算假人在游戏中的真实名称"""
-        base_name = self.name.lower()
-        return f"{config.bot_name_prefix}{base_name}{config.bot_name_suffix}"
+        return self._real_name
+
+    @property
+    def is_online(self) -> bool:
+        with self._state:
+            return self._online
+
+    @is_online.setter
+    def is_online(self, value: bool) -> None:
+        with self._state:
+            self._online = value
+            self._state.notify_all()
+
+    def cancel(self) -> None:
+        with self._state:
+            self._cancelled = True
+            self._state.notify_all()
+
+    def _execute(self, command: str) -> bool:
+        with self._state:
+            if self._cancelled or not self.server.is_server_running():
+                return False
+            self.server.execute(command)
+            return True
 
     # --- 核心动作 ---
 
     def spawn(self, executor: str | None = None, pos=None, dim=None, facing=None):
-        """
-        在世界中生成假人
-        :param executor: 如果由一名玩家执行，则假人会尝试复制其游戏模式
-        """
-        spawn_pos = pos or self.position
-        spawn_dim = dim or self.dimension
-        spawn_facing = facing or self.facing
-        
-        if spawn_pos is None or spawn_dim is None or spawn_facing is None:
-            self.server.logger.error(f"[BotKikai] 假人 {self.name} 因缺少位置、维度或朝向信息而无法生成")
-            return False
+        """发送召唤请求，并等待玩家加入事件确认上线。"""
+        with self._action_lock:
+            with self._state:
+                if self._cancelled or not self.server.is_server_running():
+                    return False
+                if self._online:
+                    return True
+            pos_str = ' '.join(map(str, self.position if pos is None else self._vector(pos, 3, 'position')))
+            facing_str = ' '.join(map(str, self.facing if facing is None else self._vector(facing, 2, 'facing')))
+            spawn_dim = self.dimension if dim is None else dim
+            if not isinstance(spawn_dim, str) or re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9_./-]+', spawn_dim) is None:
+                raise ValueError('无效的维度 ID')
+            if executor is not None and re.fullmatch(r'[A-Za-z0-9_]{3,16}', executor) is None:
+                raise ValueError('无效的执行玩家名')
+            command = f'player {self.real_name} spawn at {pos_str} facing {facing_str} in {spawn_dim}'
+            if executor:
+                command = f'execute as {executor} run {command}'
+            if not self._execute(command):
+                return False
 
-        pos_str = ' '.join(map(str, spawn_pos))
-        facing_str = ' '.join(map(str, spawn_facing))
-        
-        base_command = f'player {self.real_name} spawn at {pos_str} facing {facing_str} in {spawn_dim}'
-        
-        if executor:
-            final_command = f'execute as {executor} run {base_command}'
-        else:
-            final_command = base_command
-            
-        self.server.execute(final_command)
-        return True
+            deadline = time.monotonic() + config.spawn_max_wait_time
+            with self._state:
+                while not self._online and not self._cancelled and self.server.is_server_running():
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    self._state.wait(min(config.spawn_check_interval, remaining))
+                if self._online and not self._cancelled and self.server.is_server_running():
+                    return True
+            self.server.logger.warning(f'[BotKikai] 未能确认假人 {self.name} 上线，操作已终止')
+            return False
 
     def kill(self):
         """下线假人"""
-        self.server.execute(f'player {self.real_name} kill')
-        return True
+        with self._action_lock:
+            return self._execute(f'player {self.real_name} kill')
 
     def stop(self):
         """停止假人的所有动作"""
-        self.server.execute(f'player {self.real_name} stop')
+        with self._action_lock:
+            return self._execute(f'player {self.real_name} stop')
 
     def _ensure_online(self, executor: str | None = None):
-        if not self.is_online:
-            self.spawn(executor=executor)
-            
-            max_wait_time = config.spawn_max_wait_time
-            wait_interval = config.spawn_check_interval
-            waited_time = 0
-            
-            while not self.is_online and waited_time < max_wait_time:
-                time.sleep(wait_interval)
-                waited_time += wait_interval
-            
-            if not self.is_online:
-                self.server.logger.warning(f"[BotKikai] 假人 {self.name} 在 {max_wait_time} 秒内未能成功上线，后续动作可能失败")
+        return self.spawn(executor=executor)
+
+    def _interact(self, action: str, continuous: bool, interval: int, executor: str | None) -> bool:
+        if type(interval) is not int or interval < 0:
+            raise ValueError('动作间隔必须是非负整数')
+        with self._action_lock:
+            if not self._ensure_online(executor):
+                return False
+            mode = ('continuous' if interval == 0 else f'interval {interval}') if continuous else 'once'
+            return self._execute(f'player {self.real_name} {action} {mode}')
 
     # --- 交互动作 ---
 
     def use(self, continuous: bool = False, interval: int = 0, executor: str | None = None):
         """让假人执行“使用”（右键）动作"""
-        self._ensure_online(executor)
-        if continuous:
-            action = f'use continuous' if interval <= 0 else f'use interval {interval}'
-        else:
-            action = 'use once'
-        self.server.execute(f'player {self.real_name} {action}')
+        return self._interact('use', continuous, interval, executor)
 
     def attack(self, continuous: bool = False, interval: int = 0, executor: str | None = None):
         """让假人执行“攻击”（左键）动作"""
-        self._ensure_online(executor)
-        if continuous:
-            action = f'attack continuous' if interval <= 0 else f'attack interval {interval}'
-        else:
-            action = 'attack once'
-        self.server.execute(f'player {self.real_name} {action}')
+        return self._interact('attack', continuous, interval, executor)
 
     # --- 状态与效果 ---
 
     def glowing(self, duration_sec: int = 120, amplifier: int = 0, executor: str | None = None):
         """为假人应用发光效果"""
-        self._ensure_online(executor)
-        self.server.execute(f'effect give {self.real_name} glowing {duration_sec} {amplifier}')
+        with self._action_lock:
+            if not self._ensure_online(executor):
+                return False
+            return self._execute(f'effect give {self.real_name} glowing {duration_sec} {amplifier}')
 
     # --- 数据转换 ---
 
     def to_dict(self) -> dict:
         return {
-            'nicknames': self.nicknames,
+            'nicknames': self.nicknames.copy(),
             'dimension': self.dimension,
-            'position': self.position,
-            'facing': self.facing,
+            'position': self.position.copy(),
+            'facing': self.facing.copy(),
         }
 
     @staticmethod
-    def from_dict(server: PluginServerInterface, name: str, data: dict) -> "Bot":
+    def from_dict(server: PluginServerInterface, name: str, data: dict, settings: Config | None = None) -> "Bot":
+        if not isinstance(data, dict):
+            raise ValueError(f'{name}: 假人数据必须是 JSON 对象')
         # 兼容旧的 'nick', 'dim', 'pos' 键
         nicknames = data.get('nicknames', data.get('nick', [name]))
+        if 'nicknames' not in data and isinstance(nicknames, str):
+            nicknames = [nicknames]
         dimension = data.get('dimension', data.get('dim', 'minecraft:overworld'))
         position = data.get('position', data.get('pos', [0.0, 64.0, 0.0]))
-        facing_data = data.get('facing', [0.0, 0.0])
-        facing = [float(v) for v in facing_data.split()] if isinstance(facing_data, str) else facing_data
+        facing = data.get('facing', [0.0, 0.0])
 
         return Bot(
             server=server,
@@ -126,7 +182,8 @@ class Bot:
             nicknames=nicknames,
             dimension=dimension,
             position=position,
-            facing=facing
+            facing=facing,
+            settings=settings,
         )
     
     def _get_command_rtext(self) -> RTextList:
@@ -158,7 +215,7 @@ class Bot:
             f'§7----------- §6{self.name} {online_status} §7-----------',
             f'\n§7用于:§d {nickname}',
             f'\n§7维度:§d {self.dimension}',
-            RText(f'\n§7坐标:§d {self.position}').c(RAction.run_command, f'[x:{int(self.position[0]) if self.position else 0}, y:{int(self.position[1]) if self.position else 0}, z:{int(self.position[2]) if self.position else 0}, name:{self.name}, dim:{self.dimension}]').h('点击显示可识别坐标点'),
+            RText(f'\n§7坐标:§d {self.position}').c(RAction.suggest_command, f'[x:{math.floor(self.position[0])}, y:{math.floor(self.position[1])}, z:{math.floor(self.position[2])}, name:{self.name}, dim:{self.dimension}]').h('点击填入坐标点，按回车发送'),
             f'\n§7朝向:§d {self.facing}\n',
             self._get_command_rtext(),
         )

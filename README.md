@@ -26,12 +26,17 @@
 - 支持假人前后缀
 - 支持权限管理
 - 配置文件热重载
+- 配置校验、原子保存和加载失败保护
+- 在线状态同步及后台任务取消
 
 ## ⚙️ 依赖
 
+- Python >= 3.10
 - [MCDReforged](https://github.com/Fallen-Breath/MCDReforged) >= 2.0.0
 - [MinecraftDataAPI](https://github.com/Fallen-Breath/MinecraftDataAPI) >= 1.1.0
 - Minecraft 服务端需要安装 [Carpet](https://github.com/gnembon/fabric-carpet) 模组
+
+推荐使用 MCDR 2.16.2 和 MinecraftDataAPI 1.6.2。插件不要求开启 RCON。
 
 ## 📖 命令说明
 
@@ -50,7 +55,7 @@
 | !!bk reload | 重载插件配置 | admin |
 | !!bk add <name\> <kikai\> | 使用当前玩家位置添加假人 | admin |
 | !!bk add <name\> <kikai\> [dim] [pos] [facing] | 使用自定义参数添加假人 | admin |
-| !!bk del <kikai\> | 删除指定假人 | admin |
+| !!bk del <kikai\> | 删除指定假人的记录，不会让已在线假人下线 | admin |
 | !!bk <kikai\> | 显示假人详细信息和操作界面 | user |
 
 假人操作命令：
@@ -59,7 +64,7 @@
 |------|------|----------|
 | !!bk <kikai\> spawn | 在对应位置生成假人 | user |
 | !!bk <kikai\> kill | 移除假人 | user |
-| !!bk <kikai\> where | 显示假人位置（会让假人发光2分钟） | user |
+| !!bk <kikai\> where | 显示记录的假人位置，并请求让假人发光2分钟 | user |
 | !!bk <kikai\> use | 假人右键一次 | user |
 | !!bk <kikai\> huse [<interval\>] | 假人持续右键，可选间隔时间（gt） | user |
 | !!bk <kikai\> atk | 假人左键一次 | user |
@@ -75,6 +80,8 @@
     ```
 
     玩家站在期望的位置和朝向执行此命令，假人的位置和朝向会被自动记录。
+
+    假人基础名称只能包含英文字母、数字和下划线；加上前后缀后的游戏名长度须为 3–16。名称和别名不区分大小写，不能与其他假人的名称、游戏名或别名重复。别名不能包含空白，也不能使用管理命令 `add`、`del`、`list`、`reload`。
 
     你也可以手动指定位置（不建议，挺麻烦的）：
 
@@ -117,11 +124,13 @@
 
     - prefix_short: 命令前缀
     - spawn_max_wait_time: 等待假人生成的最大时间（秒）
-    - spawn_check_interval: 检查假人是否生成的间隔（秒）
+    - spawn_check_interval: 等待期间检查服务器状态的最大间隔（秒），加入事件会立即唤醒等待
     - bot_name_prefix: 在 Carpet 中设置的假人前缀
     - bot_name_suffix: 在 Carpet 中设置的假人后缀
     - permission.bot: 操作假人的最低权限等级
     - permission.list: 管理假人的最低权限等级
+
+    两个时间值必须是大于 0 的有限数值，权限值必须是 0–4 的整数。前后缀仅支持英文字母、数字和下划线，总长度不能超过 15。省略的配置项使用默认值，`permission` 也会逐项补默认值。未知配置项、无效坐标、名称冲突等会导致加载被拒绝，而不是静默重置。
 
 2. `bots.json` - 假人数据：
 
@@ -142,6 +151,15 @@
     - dimension: 假人所在维度
     - position: 假人的位置坐标 [x, y, z]
     - facing: 假人的朝向角度 [水平角, 垂直角]
+
+### 重载与数据保护
+
+- 修改配置或假人数据后执行 `!!bk reload`。两个文件全部验证通过后才应用；从 `bots.json` 删除的记录会同步移除，游戏名未改变的在线状态会保留，并异步查询实际在线玩家列表。
+- **修改 `prefix_short` 后需要执行 `!!MCDR plugin reload bot_kikai`。** 普通配置重载会明确拒绝此次变更并保留原配置，避免出现按钮前缀和已注册命令不一致。
+- 文件无效时不会覆盖原文件；如果 `bots.json` 无法加载，添加、修改、删除及保存会暂停，修复文件并成功重载后恢复。已有有效内存状态仍可用于操作假人。
+- 文件使用临时文件加原子替换保存，并串行提交修改。旧格式迁移会先备份，且不会覆盖内容不同的现有 `bots.json`。
+- 重载、卸载、删除记录或服务器停止时，会取消对应的未完成动作，避免旧任务稍后继续执行。后台并发限制为 4 个任务，运行及排队任务合计最多 32 个，队列满时会提示重试。
+- 召唤需要收到上线事件或在线列表确认才算成功；超时不会继续发送后续动作。右键、攻击、下线等只能确认请求已发送，实际结果请结合游戏和 Carpet 日志判断。
 
 ## 🔒 权限系统
 
@@ -170,6 +188,17 @@
   - 这也带来了一个好处：对于类似 `!!bk <kikai> huse [间隔gt]` 这样需要自定义参数的命令，玩家可以在发送前修改参数
   - 具体详见 [MCDReforged #203](https://github.com/MCDReforged/MCDReforged/issues/203)
 - 对于某些版本的 Carpet 模组，假人可能无法操作拉杆，建议替换成音符盒式开关或其他支持假人右键的方式。
+- 如果旧数据存在重复别名、非标准游戏名或无效字段，请先调整数据再升级；校验失败时原文件会保留。位置显示的是登记位置，不会实时跟踪假人被移动后的坐标。
+
+## 🧪 开发与测试
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+python -m mcdreforged pack
+```
+
+回归测试覆盖配置保护、并发保存、在线状态同步、召唤超时、生命周期取消及命令解析。CI 矩阵覆盖最低支持的 MCDR 2.0.0 和 MCDR 2.16.2，并在发布打包前运行测试；它们不替代实际 Minecraft/Carpet 环境中的验证。
 
 ## ⚠️ 声明
 
