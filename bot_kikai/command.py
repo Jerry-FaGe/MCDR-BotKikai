@@ -21,7 +21,8 @@ def list_bots(source: CommandSource, bot_manager: BotManager, status: str = 'all
     else:
         bots_to_show = bot_manager.get_all_bots()
 
-    source.reply(view.render_bot_list(bots_to_show))
+    source.reply(view.render_bot_list(
+        bots_to_show, can_operate=source.has_permission(config.permission['bot'])))
 
 def reload_plugin(source: CommandSource, bot_manager: BotManager):
     try:
@@ -109,6 +110,9 @@ def edit_alias(source: CommandSource, context: dict, bot_manager: BotManager, *,
         source.reply(f'§b[BotKikai] §7{target} 已可通过 {alias} 查找，无需重复添加')
 
 def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: BotManager, generation: int | None = None):
+    if action == 'alias' and not source.has_permission(config.permission['list']):
+        source.reply('§b[BotKikai] §c权限不足')
+        return
     nickname = context['nickname']
     try:
         bot = bot_manager.get_bot_by_nickname(nickname, generation=generation)
@@ -119,7 +123,14 @@ def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: 
         return
 
     if action == 'info':
-        source.reply(view.render_bot_info(bot))
+        source.reply(view.render_bot_info(
+            bot,
+            can_operate=source.has_permission(config.permission['bot']),
+            can_manage=source.has_permission(config.permission['list']),
+        ))
+        return
+    if action == 'alias':
+        source.reply(view.render_alias_panel(bot))
         return
 
     if not source.has_permission(config.permission['bot']):
@@ -161,7 +172,7 @@ def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: 
         source.reply(f'§b[BotKikai] §c假人 {bot.name} 操作失败或已取消；请检查服务器状态、召唤超时及 Carpet 日志')
 
 def bot_action(source: CommandSource, context: dict, action: str, bot_manager: BotManager):
-    if action == 'info':
+    if action in ('info', 'alias'):
         return _bot_action(source, context, action, bot_manager, bot_manager.generation)
     if not source.has_permission(config.permission['bot']):
         source.reply('§b[BotKikai] §c权限不足')
@@ -198,7 +209,9 @@ def register_command_tree(server: PluginServerInterface, bot_manager: BotManager
     ).then(
         Literal('stop').runs(lambda src, ctx: bot_action(src, ctx, 'stop', bot_manager))
     ).then(
-        Literal('alias').requires(lambda src: src.has_permission(config.permission['list'])).then(
+        Literal('alias').requires(lambda src: src.has_permission(config.permission['list'])).runs(
+            lambda src, ctx: bot_action(src, ctx, 'alias', bot_manager)
+        ).then(
             Literal('add').then(
                 Text('alias').runs(lambda src, ctx: edit_alias(src, ctx, bot_manager))
             )

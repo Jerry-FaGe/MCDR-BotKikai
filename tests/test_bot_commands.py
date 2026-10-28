@@ -284,7 +284,7 @@ def test_alias_command_permissions_follow_current_config(env, bot):
     assert env.manager.get_bot_by_nickname('new') is bot
 
 
-@pytest.mark.parametrize('arguments', ['alias', 'alias add', 'alias del', 'alias add new extra'])
+@pytest.mark.parametrize('arguments', ['alias add', 'alias del', 'alias add new extra'])
 def test_incomplete_or_extra_alias_arguments_do_not_modify_data(env, bot, arguments):
     command.register_command_tree(env.server, env.manager)
     before = Path(config.bots_path).read_bytes()
@@ -335,3 +335,102 @@ def test_failed_alias_save_does_not_reply_success(env, bot, monkeypatch):
     assert '\u522b\u540d\u4fee\u6539\u5931\u8d25' in env.source.messages[-1]
     assert '\u5df2\u4e3a' not in env.source.messages[-1]
     assert env.manager.get_bot_by_nickname('new') is None
+
+
+@pytest.mark.parametrize('source_name', ['source', 'player'])
+@pytest.mark.parametrize('prefix', ['!!bk', '!!farm'])
+def test_alias_panel_is_read_only_and_works_with_server_stopped(env, bot, monkeypatch, source_name, prefix):
+    config.prefix_short = prefix
+    env.server.running = False
+    source = getattr(env, source_name)
+    command.register_command_tree(env.server, env.manager)
+    before = {path: path.read_bytes() for path in env.path.iterdir()}
+    saved_bot = bot.to_dict()
+    generation = env.manager.generation
+
+    def fail(*args, **kwargs):
+        raise AssertionError('rendering must not schedule actions or query Minecraft')
+
+    monkeypatch.setattr(env.manager, 'submit', fail)
+    monkeypatch.setattr(utils, 'get_pos', fail)
+    monkeypatch.setattr(env.manager, 'request_sync', fail)
+    run_command(env.server.roots[0], source, f'{prefix} farm alias')
+
+    assert '\u522b\u540d\u7ba1\u7406' in source.messages[-1]
+    assert '[\u79fb\u9664]' in source.messages[-1]
+    assert env.manager.generation == generation
+    assert env.manager.get_bot('SandBot') is bot
+    assert bot.to_dict() == saved_bot
+    assert {path: path.read_bytes() for path in env.path.iterdir()} == before
+    assert env.server.commands == []
+
+
+@pytest.mark.parametrize('permission', [0, 1, 2])
+def test_alias_panel_requires_permission_in_tree_and_callback(env, bot, permission):
+    env.source.permission = permission
+    command.register_command_tree(env.server, env.manager)
+    before = Path(config.bots_path).read_bytes()
+    with pytest.raises(CommandError):
+        run_command(env.server.roots[0], env.source, '!!bk farm alias')
+    command.bot_action(env.source, {'nickname': 'farm'}, 'alias', env.manager)
+    assert '\u6743\u9650\u4e0d\u8db3' in env.source.messages[-1]
+    assert Path(config.bots_path).read_bytes() == before
+
+
+def test_alias_panel_handles_missing_record_and_changed_permission(env, bot):
+    command.register_command_tree(env.server, env.manager)
+    root = env.server.roots[0]
+    run_command(root, env.source, '!!bk missing alias')
+    assert '\u672a\u67e5\u8be2\u5230' in env.source.messages[-1]
+
+    env.source.permission = 2
+    config.permission['list'] = 2
+    run_command(root, env.source, '!!bk farm alias')
+    assert '\u522b\u540d\u7ba1\u7406' in env.source.messages[-1]
+    config.permission['list'] = 3
+    with pytest.raises(CommandError):
+        run_command(root, env.source, '!!bk farm alias')
+    assert env.manager.get_bot('SandBot') is bot
+
+
+def test_panel_commands_round_trip_and_old_panels_cannot_bypass_permissions(env, bot, monkeypatch):
+    def clicks(value):
+        if isinstance(value, dict):
+            if 'clickEvent' in value:
+                yield value['text'], value['clickEvent']['value']
+            for child in value.values():
+                yield from clicks(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from clicks(child)
+
+    config.prefix_short = '!!farm'
+    bot.is_online = True
+    messages = []
+    monkeypatch.setattr(env.source, 'reply', messages.append)
+    command.register_command_tree(env.server, env.manager)
+    root = env.server.roots[0]
+
+    run_command(root, env.source, '!!farm farm')
+    detail = dict(clicks(json.loads(messages[-1].to_json_str())))
+    run_command(root, env.source, detail['[\u79fb\u9664\u522b\u540d]'])
+    alias_clicks = list(clicks(json.loads(messages[-1].to_json_str())))
+    remove_farm = next(value for label, value in alias_clicks if value.endswith(' alias del farm'))
+    run_command(root, env.source, remove_farm)
+    assert env.manager.get_bot_by_nickname('farm') is None
+
+    back = next(value for label, value in alias_clicks if label == '[\u8fd4\u56de\u8be6\u60c5]')
+    run_command(root, env.source, back)
+    assert '\u5047\u4eba\u540d:' in messages[-1].to_plain_text()
+    assert env.manager.get_bot('SandBot') is bot
+
+    env.source.permission = 0
+    for label in ['[\u79fb\u9664\u522b\u540d]', '[\u5220\u9664\u8bb0\u5f55]']:
+        with pytest.raises(CommandError):
+            run_command(root, env.source, detail[label])
+    with pytest.raises(CommandError):
+        run_command(root, env.source, remove_farm)
+    run_command(root, env.source, detail['[\u53f3\u952e]'])
+    assert '\u6743\u9650\u4e0d\u8db3' in messages[-1]
+    assert env.manager.get_bot('SandBot') is bot
+    assert env.server.commands == []
