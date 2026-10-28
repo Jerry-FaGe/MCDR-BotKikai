@@ -1,10 +1,9 @@
-import math
 import re
 import threading
 import time
 
 from mcdreforged.api.types import PluginServerInterface, ServerInterface
-from mcdreforged.api.rtext import RText, RTextList, RAction
+from mcdreforged.api.rtext import RTextList
 
 from .config import Config, config, is_finite_number
 
@@ -186,54 +185,15 @@ class Bot:
             settings=settings,
         )
     
+    # Keep the existing entry points; all rendering lives in view.
     def _get_command_rtext(self) -> RTextList:
-        special_rtext = RTextList()
-        if self.is_online:
-            special_rtext.append(
-                RText('§4[下线] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} kill').h(f'下线 §6{self.name}'),
-                RText('§b[停止] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} stop').h(f'§6{self.name} §7停止所有动作'),
-            )
-        else:
-            special_rtext.append(
-                RText('§a[上线] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} spawn').h(f'召唤 §6{self.name}'),
-            )
-
-        return RTextList(
-            special_rtext,
-            RText('§b[报点] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} where').h(f'§6{self.name} §7发光两分钟并输出坐标'),
-            RText('§b[右键] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} use').h(f'§6{self.name} §7右键一次'),
-            RText('§b[持续右键] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} huse ').h(f'§6{self.name} §7持续右键，后接正整数可控制间隔 gt'),
-            RText('§b[左键] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} atk').h(f'§6{self.name} §7左键一次'),
-            RText('§b[持续左键] ').c(RAction.suggest_command, f'{config.prefix_short} {self.name} hatk ').h(f'§6{self.name} §7持续左键，后接正整数可控制间隔 gt'),
-        )
+        from .view import render_bot_actions
+        return render_bot_actions(self)
 
     def get_info_rtext(self) -> RTextList:
-        nickname_ls = list(filter(lambda x: x.lower() not in [self.name.lower(), self.real_name.lower()], self.nicknames))
-        nickname = ", ".join(nickname_ls)
-        online_status = '§a在线' if self.is_online else '§4离线'
-        return RTextList(
-            f'§7----------- §6{self.name} {online_status} §7-----------',
-            f'\n§7用于:§d {nickname}',
-            f'\n§7维度:§d {self.dimension}',
-            RText(f'\n§7坐标:§d {self.position}').c(RAction.suggest_command, f'[x:{math.floor(self.position[0])}, y:{math.floor(self.position[1])}, z:{math.floor(self.position[2])}, name:{self.name}, dim:{self.dimension}]').h('点击填入坐标点，按回车发送'),
-            f'\n§7朝向:§d {self.facing}\n',
-            self._get_command_rtext(),
-        )
-    
+        from .view import render_bot_info
+        return render_bot_info(self)
+
     def get_simple_rtext(self) -> RTextList:
-        nickname_ls = list(filter(lambda x: x.lower() not in [self.name.lower(), self.real_name.lower()], self.nicknames))
-        nickname = ", ".join(nickname_ls)
-        online_status = '§a在线' if self.is_online else '§4离线'
-        return RTextList(
-            '\n'
-            f'§7----------- ',
-            RText(f'§6{self.name}').h(
-                f'§7用于:§d {nickname}\n',
-                f'§7维度:§d {self.dimension}\n',
-                f'§7坐标:§d {self.position}\n',
-                f'§7朝向:§d {self.facing}'
-            ),
-            f' {online_status} §7-----------\n',
-            f'§7此假人用于:§d {nickname}\n',
-            self._get_command_rtext(),
-        )
+        from .view import render_bot_summary
+        return render_bot_summary(self)

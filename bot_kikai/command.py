@@ -2,20 +2,15 @@ import math
 
 from mcdreforged.api.command import Literal, Text, Float, Integer
 from mcdreforged.api.types import PluginServerInterface, CommandSource, PlayerCommandSource
-from mcdreforged.api.rtext import RTextList, RText, RAction
 
 from .bot_manager import BotManager
 from .bot import Bot
 from .config import config
-from . import utils
+from . import utils, view
 
 
 def show_help(source: CommandSource):
-    head = [utils.help_head]
-    body = [RText(f'{k}§7: {v}\n').c(
-        RAction.suggest_command, k.replace('§7', '').replace('§6', '')).h(v)
-        for k, v in utils.get_help_body().items()]
-    source.reply(RTextList(*(head + body)))
+    source.reply(view.render_help())
 
 def list_bots(source: CommandSource, bot_manager: BotManager, status: str = 'all'):
     bots_to_show: list[Bot] = []
@@ -26,15 +21,7 @@ def list_bots(source: CommandSource, bot_manager: BotManager, status: str = 'all
     else:
         bots_to_show = bot_manager.get_all_bots()
 
-    if not bots_to_show:
-        source.reply("§b[BotKikai] §7没有找到符合条件的假人")
-        return
-
-    msg_list: list[RTextList] = []
-    for bot in bots_to_show:
-        msg_list.append(bot.get_simple_rtext())
-        msg_list.append(RTextList("\n"))
-    source.reply(RTextList(*msg_list))
+    source.reply(view.render_bot_list(bots_to_show))
 
 def reload_plugin(source: CommandSource, bot_manager: BotManager):
     try:
@@ -114,7 +101,7 @@ def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: 
         return
 
     if action == 'info':
-        source.reply(bot.get_info_rtext())
+        source.reply(view.render_bot_info(bot))
         return
 
     if not source.has_permission(config.permission['bot']):
