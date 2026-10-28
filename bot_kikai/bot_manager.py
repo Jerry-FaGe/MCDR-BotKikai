@@ -179,6 +179,52 @@ class BotManager:
             self._commit(bots)
             return True
 
+    def add_alias(self, target: str, alias: str) -> bool:
+        return self._edit_alias(target, alias, remove=False)
+
+    def remove_alias(self, target: str, alias: str) -> bool:
+        return self._edit_alias(target, alias, remove=True)
+
+    def _edit_alias(self, target: str, alias: str, *, remove: bool) -> bool:
+        with self._lock:
+            self._check_writable()
+            bot = self._aliases.get(target.casefold())
+            if bot is None:
+                raise ValueError(f'未查询到 {target} 对应的假人')
+            if not isinstance(alias, str) or not alias or any(
+                ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in alias
+            ):
+                raise ValueError('别名必须是非空、无空白或控制字符的字符串')
+            key = alias.casefold()
+            if remove:
+                if key in {bot.name.casefold(), bot.real_name.casefold()}:
+                    raise ValueError('登记名和游戏名不能通过删除别名移除')
+                nicknames = [nick for nick in bot.nicknames if nick.casefold() != key]
+                if nicknames == bot.nicknames:
+                    return False
+            else:
+                if self._aliases.get(key) is bot:
+                    return False
+                nicknames = [*bot.nicknames, alias]
+
+            replacement = Bot.from_dict(self.server, bot.name, {**bot.to_dict(), 'nicknames': nicknames})
+            aliases, _ = self._indexes({**self.bots, bot.name: replacement})
+            data, saved_bots = self._read_bot_data(config)
+            saved = saved_bots.get(bot.name)
+            if saved is None or saved.nicknames != bot.nicknames:
+                raise RuntimeError(f'磁盘上的假人记录或别名已变更，请先执行 {config.prefix_short} reload')
+            saved.nicknames = replacement.nicknames
+            self._indexes(saved_bots)
+            # Only patch aliases; external coordinates, names and other records stay intact.
+            data[bot.name]['nicknames'] = replacement.nicknames
+            data[bot.name].pop('nick', None)
+            write_json(config.bots_path, data)
+
+            # Keep the active Bot and its status version, so waiting actions are not cancelled.
+            bot.nicknames = replacement.nicknames
+            self._aliases = {key: bot if value is replacement else value for key, value in aliases.items()}
+            return True
+
     def get_bot(self, name: str) -> Bot | None:
         with self._lock:
             return self.bots.get(name)

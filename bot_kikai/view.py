@@ -30,6 +30,8 @@ def get_help_body() -> dict[str, str]:
         f"§7{config.prefix_short} add §6<name> <kikai>": "§r使用当前玩家参数添加一个名为 §6<name> §r用于 §6<kikai> §r的假人",
         f"§7{config.prefix_short} add §6<name> <kikai> <dim> <pos> <facing>": "§r使用自定义参数添加一个名为 §6<name> §r用于 §6<kikai> §r的假人",
         f"§7{config.prefix_short} del §6<kikai>": "§r删除用于 §6<kikai> §r的假人记录（不会下线）",
+        f"§7{config.prefix_short} §6<kikai> §7alias add §6<alias>": "§r添加别名，不改变登记位置和朝向",
+        f"§7{config.prefix_short} §6<kikai> §7alias del §6<alias>": "§r移除别名，不删除假人记录或下线假人",
         f"§7{config.prefix_short} §6<kikai>": "§r输出用于 §6<kikai> §r的假人信息",
         f'§7{config.prefix_short} §6<kikai> §7spawn': "§r上线用于 §6<kikai> §r的假人",
         f"§7{config.prefix_short} §6<kikai> §7kill": "§r下线用于 §6<kikai> §r的假人",

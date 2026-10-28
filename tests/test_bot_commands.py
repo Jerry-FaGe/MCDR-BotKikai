@@ -233,3 +233,105 @@ def test_get_pos_handles_api_failure(env, monkeypatch):
 
     monkeypatch.setitem(sys.modules, 'minecraft_data_api', SimpleNamespace(get_player_info=fail))
     assert utils.get_pos(env.server, 'Tester') == (None, None, None)
+
+
+@pytest.mark.parametrize('source_name', ['source', 'player'])
+@pytest.mark.parametrize('prefix', ['!!bk', '!!farm'])
+def test_alias_commands_work_without_minecraft_queries_or_bot_actions(env, bot, monkeypatch, source_name, prefix):
+    source = getattr(env, source_name)
+    config.prefix_short = prefix
+    env.server.running = False
+    command.register_command_tree(env.server, env.manager)
+    root = env.server.roots[0]
+
+    def fail(*args):
+        raise AssertionError('alias edits must not query Minecraft')
+
+    monkeypatch.setattr(utils, 'get_pos', fail)
+    monkeypatch.setattr(env.manager, 'request_sync', fail)
+    run_command(root, source, f'{prefix} farm alias add \u6c99\u573a')
+    assert env.manager.get_bot_by_nickname('\u6c99\u573a') is bot
+    assert '\u5df2\u4e3a' in source.messages[-1]
+    run_command(root, source, f'{prefix} \u6c99\u573a alias del FARM')
+    assert env.manager.get_bot_by_nickname('farm') is None
+    assert bot.position == [1.5, 64, -2.5]
+    assert not env.server.commands
+
+
+@pytest.mark.parametrize('remove', [False, True])
+@pytest.mark.parametrize('permission', [0, 1, 2])
+def test_alias_commands_require_management_permission(env, bot, permission, remove):
+    env.source.permission = permission
+    command.register_command_tree(env.server, env.manager)
+    operation = 'del' if remove else 'add'
+    before = Path(config.bots_path).read_bytes()
+    with pytest.raises(CommandError):
+        run_command(env.server.roots[0], env.source, f'!!bk farm alias {operation} new')
+    command.edit_alias(env.source, {'nickname': 'farm', 'alias': 'new'}, env.manager, remove=remove)
+    assert '\u6743\u9650' in env.source.messages[-1]
+    assert Path(config.bots_path).read_bytes() == before
+
+
+def test_alias_command_permissions_follow_current_config(env, bot):
+    env.source.permission = 2
+    command.register_command_tree(env.server, env.manager)
+    config.permission['list'] = 2
+    run_command(env.server.roots[0], env.source, '!!bk farm alias add new')
+    assert env.manager.get_bot_by_nickname('new') is bot
+    config.permission['list'] = 3
+    with pytest.raises(CommandError):
+        run_command(env.server.roots[0], env.source, '!!bk farm alias del new')
+    assert env.manager.get_bot_by_nickname('new') is bot
+
+
+@pytest.mark.parametrize('arguments', ['alias', 'alias add', 'alias del', 'alias add new extra'])
+def test_incomplete_or_extra_alias_arguments_do_not_modify_data(env, bot, arguments):
+    command.register_command_tree(env.server, env.manager)
+    before = Path(config.bots_path).read_bytes()
+    with pytest.raises(CommandError):
+        run_command(env.server.roots[0], env.source, f'!!bk farm {arguments}')
+    assert Path(config.bots_path).read_bytes() == before
+
+
+def test_alias_command_replies_distinguish_no_ops_and_errors(env, bot):
+    command.register_command_tree(env.server, env.manager)
+    root = env.server.roots[0]
+    before = Path(config.bots_path).read_bytes()
+    run_command(root, env.source, '!!bk farm alias add FARM')
+    assert '\u65e0\u9700\u91cd\u590d\u6dfb\u52a0' in env.source.messages[-1]
+    run_command(root, env.source, '!!bk farm alias del missing')
+    assert '\u672a\u4f5c\u4fee\u6539' in env.source.messages[-1]
+    run_command(root, env.source, '!!bk farm alias del SandBot')
+    assert '\u522b\u540d\u4fee\u6539\u5931\u8d25' in env.source.messages[-1]
+    run_command(root, env.source, '!!bk missing alias add new')
+    assert '\u672a\u67e5\u8be2\u5230' in env.source.messages[-1]
+    run_command(root, env.source, '!!bk farm alias add list')
+    assert '\u51b2\u7a81' in env.source.messages[-1]
+    assert Path(config.bots_path).read_bytes() == before
+
+
+def test_alias_commands_do_not_reserve_a_new_top_level_name(env):
+    env.manager.upsert_bot('alias', 'farm', 'minecraft:overworld', [0, 64, 0], [0, 0])
+    command.register_command_tree(env.server, env.manager)
+    root = env.server.roots[0]
+    run_command(root, env.source, '!!bk alias')
+    assert 'alias' in env.source.messages[-1]
+    run_command(root, env.source, '!!bk alias alias add new')
+    assert env.manager.get_bot_by_nickname('new') is env.manager.get_bot('alias')
+    run_command(root, env.source, '!!bk alias alias del new')
+    assert env.manager.get_bot_by_nickname('new') is None
+
+
+def test_failed_alias_save_does_not_reply_success(env, bot, monkeypatch):
+    import bot_kikai.bot_manager as manager_module
+
+    def fail(*args):
+        raise OSError('disk full')
+
+    monkeypatch.setattr(manager_module, 'write_json', fail)
+    command.register_command_tree(env.server, env.manager)
+    run_command(env.server.roots[0], env.source, '!!bk farm alias add new')
+    assert 'disk full' in env.source.messages[-1]
+    assert '\u522b\u540d\u4fee\u6539\u5931\u8d25' in env.source.messages[-1]
+    assert '\u5df2\u4e3a' not in env.source.messages[-1]
+    assert env.manager.get_bot_by_nickname('new') is None

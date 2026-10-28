@@ -90,6 +90,24 @@ def del_bot(source: CommandSource, context: dict, bot_manager: BotManager):
     else:
         source.reply(f"§b[BotKikai] §4未查询到 §6{nickname} §4对应的假人")
 
+def edit_alias(source: CommandSource, context: dict, bot_manager: BotManager, *, remove: bool = False):
+    if not source.has_permission(config.permission['list']):
+        source.reply('§b[BotKikai] §c权限不足')
+        return
+    target, alias = context['nickname'], context['alias']
+    method = bot_manager.remove_alias if remove else bot_manager.add_alias
+    try:
+        changed = method(target, alias)
+    except (OSError, ValueError, RuntimeError) as error:
+        source.reply(f'§b[BotKikai] §c别名修改失败: {error}')
+        return
+    if changed:
+        source.reply(f'§b[BotKikai] §a已为 §6{target} §a{"移除" if remove else "添加"}别名 §d{alias}')
+    elif remove:
+        source.reply(f'§b[BotKikai] §7{target} 没有别名 {alias}，未作修改')
+    else:
+        source.reply(f'§b[BotKikai] §7{target} 已可通过 {alias} 查找，无需重复添加')
+
 def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: BotManager, generation: int | None = None):
     nickname = context['nickname']
     try:
@@ -179,6 +197,16 @@ def register_command_tree(server: PluginServerInterface, bot_manager: BotManager
         Literal('where').runs(lambda src, ctx: bot_action(src, ctx, 'where', bot_manager))
     ).then(
         Literal('stop').runs(lambda src, ctx: bot_action(src, ctx, 'stop', bot_manager))
+    ).then(
+        Literal('alias').requires(lambda src: src.has_permission(config.permission['list'])).then(
+            Literal('add').then(
+                Text('alias').runs(lambda src, ctx: edit_alias(src, ctx, bot_manager))
+            )
+        ).then(
+            Literal('del').then(
+                Text('alias').runs(lambda src, ctx: edit_alias(src, ctx, bot_manager, remove=True))
+            )
+        )
     )
 
     add_node = Literal('add').requires(lambda src: src.has_permission(config.permission['list'])).then(

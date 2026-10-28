@@ -69,7 +69,8 @@ def test_help_reads_current_prefix_and_preserves_templates(env):
     templates = [
         '', ' list [online|offline]', ' reload',
         ' add <name> <kikai>', ' add <name> <kikai> <dim> <pos> <facing>',
-        ' del <kikai>', ' <kikai>', ' <kikai> spawn', ' <kikai> kill',
+        ' del <kikai>', ' <kikai> alias add <alias>', ' <kikai> alias del <alias>',
+        ' <kikai>', ' <kikai> spawn', ' <kikai> kill',
         ' <kikai> where', ' <kikai> use', ' <kikai> huse [<interval>]',
         ' <kikai> atk', ' <kikai> hatk [<interval>]', ' <kikai> stop',
     ]
