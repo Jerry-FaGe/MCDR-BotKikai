@@ -9,15 +9,22 @@ from .config import Config, config, is_finite_number
 
 
 class Bot:
-    def __init__(self, server: PluginServerInterface | ServerInterface, name: str, nicknames: list[str], dimension: str, position: list[float], facing: list[float], settings: Config | None = None):
+    def __init__(self, server: PluginServerInterface | ServerInterface, name: str, nicknames: list[str],
+                 dimension: str, position: list[float], facing: list[float], settings: Config | None = None,
+                 confirmed_name: str | None = None):
         settings = settings or config
         if not isinstance(name, str) or re.fullmatch(r'[A-Za-z0-9_]{1,16}', name) is None:
             raise ValueError('假人名称只能包含 1 到 16 个英文字母、数字或下划线')
         self.server = server
         self.name = name
-        self._real_name = f'{settings.bot_name_prefix}{name.lower()}{settings.bot_name_suffix}'
-        if re.fullmatch(r'[A-Za-z0-9_]{3,16}', self._real_name) is None:
+        self._expected_name = f'{settings.bot_name_prefix}{name.lower()}{settings.bot_name_suffix}'
+        if re.fullmatch(r'[A-Za-z0-9_]{3,16}', self._expected_name) is None:
             raise ValueError(f'{name}: 加上前后缀后的游戏名必须是 3 到 16 个英文字母、数字或下划线')
+        self._confirmed_name: str | None = None
+        if confirmed_name is not None:
+            if not isinstance(confirmed_name, str) or re.fullmatch(r'[A-Za-z0-9_]{3,16}', confirmed_name) is None:
+                raise ValueError(f'{name}: confirmed_name 必须是 3 到 16 个英文字母、数字或下划线')
+            self.confirm_name(confirmed_name)
         if not isinstance(nicknames, list) or not all(
             isinstance(nick, str) and nick and not any(
                 ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in nick
@@ -51,8 +58,25 @@ class Bot:
         return [float(value) for value in values]
 
     @property
+    def expected_name(self) -> str:
+        return self._expected_name
+
+    @property
+    def confirmed_name(self) -> str | None:
+        return self._confirmed_name
+
+    @property
     def real_name(self) -> str:
-        return self._real_name
+        return self._confirmed_name or self._expected_name
+
+    def confirm_name(self, player: str) -> bool:
+        """Learn spelling, not a new identity; the manager serializes observations."""
+        if not isinstance(player, str) or re.fullmatch(r'[A-Za-z0-9_]{3,16}', player) is None:
+            return False
+        if player.casefold() != self.expected_name.casefold() or player == self._confirmed_name:
+            return False
+        self._confirmed_name = player
+        return True
 
     @property
     def is_online(self) -> bool:
@@ -156,12 +180,16 @@ class Bot:
     # --- 数据转换 ---
 
     def to_dict(self) -> dict:
-        return {
+        data = {
             'nicknames': self.nicknames.copy(),
             'dimension': self.dimension,
             'position': self.position.copy(),
             'facing': self.facing.copy(),
         }
+        confirmed_name = self.confirmed_name
+        if confirmed_name is not None:
+            data['confirmed_name'] = confirmed_name
+        return data
 
     @staticmethod
     def from_dict(server: PluginServerInterface, name: str, data: dict, settings: Config | None = None) -> "Bot":
@@ -183,6 +211,7 @@ class Bot:
             position=position,
             facing=facing,
             settings=settings,
+            confirmed_name=data.get('confirmed_name'),
         )
     
     # Keep the existing entry points; all rendering lives in view.

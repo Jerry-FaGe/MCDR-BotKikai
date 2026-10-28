@@ -76,11 +76,19 @@ def _display_nicknames(bot: Bot) -> str:
                      if nick.lower() not in [bot.name.lower(), bot.real_name.lower()])
 
 
+def _display_player_name(bot: Bot) -> str:
+    confirmed_name = bot.confirmed_name
+    if confirmed_name is not None:
+        return f'§7假人名:§d {confirmed_name}'
+    return f'§7假人名:§d {bot.expected_name} §7（待确认）'
+
+
 def render_bot_info(bot: Bot) -> RTextList:
     nickname = _display_nicknames(bot)
     online_status = '§a在线' if bot.is_online else '§4离线'
     return RTextList(
         f'§7----------- §6{bot.name} {online_status} §7-----------',
+        f'\n{_display_player_name(bot)}',
         f'\n§7用于:§d {nickname}',
         f'\n§7维度:§d {bot.dimension}',
         RText(f'\n§7坐标:§d {bot.position}').c(RAction.suggest_command, f'[x:{math.floor(bot.position[0])}, y:{math.floor(bot.position[1])}, z:{math.floor(bot.position[2])}, name:{bot.name}, dim:{bot.dimension}]').h('点击填入坐标点，按回车发送'),
@@ -95,6 +103,7 @@ def render_bot_summary(bot: Bot) -> RTextList:
     return RTextList(
         '\n§7----------- ',
         RText(f'§6{bot.name}').h(
+            f'{_display_player_name(bot)}\n',
             f'§7用于:§d {nickname}\n',
             f'§7维度:§d {bot.dimension}\n',
             f'§7坐标:§d {bot.position}\n',

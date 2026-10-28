@@ -54,10 +54,11 @@ def test_panels_hide_identity_aliases_and_preserve_nickname_order(env, renderer)
               'minecraft:overworld', [1.5, 64, -2.5], [180, 0])
     nicknames = bot.nicknames.copy()
     text = renderer(bot).to_plain_text()
+    aliases = next(line for line in text.splitlines() if '\u7528\u4e8e:' in line)
 
-    assert 'farm, \u5237\u6c99\u673a' in text
-    assert 'SANDBOT' not in text
-    assert 'b_sandbot' not in text.lower()
+    assert 'farm, \u5237\u6c99\u673a' in aliases
+    assert 'SANDBOT' not in aliases
+    assert 'b_sandbot' not in aliases.lower()
     assert bot.nicknames == nicknames
 
 
@@ -153,3 +154,28 @@ def test_rendering_does_not_change_bot_state_or_saved_data(env, bot, online):
 def test_bot_render_methods_remain_compatible(env, bot, online, method, renderer):
     bot.is_online = online
     assert getattr(bot, method)().to_json_str() == renderer(bot).to_json_str()
+
+
+@pytest.mark.parametrize('online', [False, True])
+@pytest.mark.parametrize('confirmed', [False, True])
+@pytest.mark.parametrize('renderer', [view.render_bot_info, view.render_bot_summary])
+def test_player_name_shows_confirmation_only_while_unknown(env, online, confirmed, renderer):
+    config.bot_name_prefix = 'b_'
+    bot = Bot(env.server, 'SandBot', ['farm'], 'minecraft:overworld', [0, 64, 0], [0, 0])
+    bot.is_online = online
+    if confirmed:
+        assert bot.confirm_name('b_SandBot')
+    before = bot.to_dict()
+    message = renderer(bot)
+    text = json.dumps(json.loads(message.to_json_str()), ensure_ascii=False)
+
+    assert '\u5047\u4eba\u540d:' in text
+    assert ('b_SandBot' if confirmed else 'b_sandbot') in text
+    assert ('\u5f85\u786e\u8ba4' in text) is not confirmed
+    assert '\u4e0a\u6b21\u786e\u8ba4' not in text
+    assert '\u5df2\u786e\u8ba4' not in text
+    assert '\u57fa\u7840\u540d' not in text
+    assert '\u6e38\u620f\u540d' not in text
+    assert all(command.startswith('!!bk SandBot ') for command in _click_commands(message)
+               if command.startswith('!!bk'))
+    assert bot.to_dict() == before

@@ -144,12 +144,15 @@ def test_name_and_alias_collisions_are_rejected(env, bot, name, alias):
 def test_real_names_work_without_writing_aliases_on_join(env, bot):
     write_json(config.config_path, {'bot_name_prefix': 'b_'})
     env.manager.reload_config()
-    before = Path(config.bots_path).read_bytes()
+    before = read_json(config.bots_path)
     bot_kikai.bot_manager_instance = env.manager
     bot_kikai.on_player_joined(env.server, 'b_SandBot', None)
     current = env.manager.get_bot_by_nickname('B_SANDBOT')
     assert current.is_online
-    assert Path(config.bots_path).read_bytes() == before
+    assert current.real_name == 'b_SandBot'
+    env.manager.shutdown()
+    before['SandBot']['confirmed_name'] = 'b_SandBot'
+    assert read_json(config.bots_path) == before
 
 
 def test_sync_discovers_already_online_bots(env, bot, monkeypatch):

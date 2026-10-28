@@ -22,6 +22,9 @@ class BotManager:
         self._generation = 0
         self._closed = False
         self._write_blocked = False
+        self._pending_names: dict[str, str] = {}
+        self._name_save_future: Future | None = None
+        self._name_save_failed = False
         self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix='botkikai')
         self._slots = threading.BoundedSemaphore(self.MAX_PENDING_TASKS)
         self._tasks: set[Future] = set()
@@ -64,19 +67,34 @@ class BotManager:
             real_names[bot.real_name.casefold()] = bot
         return aliases, real_names
 
-    def _read_bots(self, settings: Config) -> dict[str, Bot]:
+    def _read_bot_data(self, settings: Config) -> tuple[dict, dict[str, Bot]]:
         try:
             data = read_json(config.bots_path)
             if not isinstance(data, dict):
                 raise ValueError('bots.json 必须是 JSON 对象')
             bots = {name: Bot.from_dict(self.server, name, value, settings) for name, value in data.items()}
             self._indexes(bots)
-            return bots
+            return data, bots
         except (OSError, ValueError):
             self._write_blocked = True
             raise
 
+    def _read_bots(self, settings: Config) -> dict[str, Bot]:
+        return self._read_bot_data(settings)[1]
+
+    def _inherit_confirmed_names(self, bots: dict[str, Bot]) -> dict[str, str]:
+        inherited = {}
+        for bot in bots.values():
+            old = self._real_names.get(bot.expected_name.casefold())
+            if old is not None and old.confirmed_name is not None and (
+                bot.confirmed_name is None or old.name in self._pending_names
+            ):
+                if bot.confirm_name(old.confirmed_name):
+                    inherited[bot.name] = old.confirmed_name
+        return inherited
+
     def _install(self, bots: dict[str, Bot]) -> None:
+        inherited = self._inherit_confirmed_names(bots)
         aliases, real_names = self._indexes(bots)
         online_names = {bot.real_name.casefold() for bot in self.bots.values() if bot.is_online}
         for name, old_bot in self.bots.items():
@@ -89,6 +107,10 @@ class BotManager:
         self.bots = bots
         self._aliases = aliases
         self._real_names = real_names
+        self._pending_names = {
+            name: player for name, player in {**self._pending_names, **inherited}.items()
+            if name in bots and bots[name].confirmed_name == player
+        }
 
     def load(self) -> None:
         with self._lock:
@@ -97,6 +119,8 @@ class BotManager:
             self._install(bots)
             self._generation += 1
             self._write_blocked = False
+            self._name_save_failed = False
+            self._request_name_save()
 
     def reload_config(self) -> None:
         with self._lock:
@@ -109,17 +133,22 @@ class BotManager:
             self._install(bots)
             self._generation += 1
             self._write_blocked = False
+            self._name_save_failed = False
+            self._request_name_save()
 
     def _persist(self, bots: dict[str, Bot]) -> None:
         self._check_writable()
         self._read_bots(config)
         write_json(config.bots_path, {name: bot.to_dict() for name, bot in bots.items()})
+        self._pending_names.clear()
+        self._name_save_failed = False
 
     def save(self) -> None:
         with self._lock:
             self._persist(self.bots)
 
     def _commit(self, bots: dict[str, Bot]) -> None:
+        self._inherit_confirmed_names(bots)
         self._indexes(bots)
         self._persist(bots)
         self._install(bots)
@@ -190,13 +219,65 @@ class BotManager:
         bot.is_online = online
         self._status_versions[bot] += 1
 
-    def update_player_status(self, player: str, online: bool) -> None:
+    def _confirm_name(self, bot: Bot, player: str) -> None:
+        if bot.confirm_name(player):
+            self._pending_names[bot.name] = player
+        self._name_save_failed = False
+
+    def update_player_status(self, player: str, online: bool, *, confirm: bool = True) -> None:
         with self._lock:
             if self._closed:
                 return
             bot = self._real_names.get(player.casefold())
             if bot:
+                if confirm:
+                    self._confirm_name(bot, player)
                 self._set_online(bot, online)
+                self._request_name_save()
+
+    def _request_name_save(self) -> None:
+        # Called under _lock; one queued task always reads the latest pending names.
+        if self._closed or self._write_blocked or self._name_save_failed or not self._pending_names:
+            return
+        if self._name_save_future is None:
+            try:
+                self._name_save_future = self.submit(self._save_confirmed_names)
+            except RuntimeError:
+                # A full queue retries when an existing task releases its slot.
+                pass
+
+    def _save_confirmed_names(self) -> None:
+        with self._lock:
+            if not self._closed:
+                self._flush_confirmed_names()
+
+    def _flush_confirmed_names(self) -> None:
+        # The caller holds _lock, including the final metadata-only flush at unload.
+        if not self._pending_names or self._write_blocked:
+            return
+        try:
+            data, saved_bots = self._read_bot_data(config)
+            changed = False
+            for name, player in self._pending_names.items():
+                current = self.bots.get(name)
+                saved = saved_bots.get(name)
+                if current is None or saved is None or current.confirmed_name != player:
+                    continue
+                if saved.expected_name.casefold() != current.expected_name.casefold():
+                    continue
+                # Patch only metadata, retaining external edits and deleted records.
+                if data[name].get('confirmed_name') != player:
+                    data[name]['confirmed_name'] = player
+                    changed = True
+            if changed:
+                write_json(config.bots_path, data)
+        except (OSError, ValueError) as error:
+            self._name_save_failed = True
+            retry = '请修复 bots.json 并重载' if self._write_blocked else '将在后续确认、重载或卸载时重试'
+            self.server.logger.warning(f'[BotKikai] 假人真实名保存失败，内存中的名称仍可使用；{retry}: {error}')
+            return
+        self._pending_names.clear()
+        self._name_save_failed = False
 
     def clear_all_online_status(self):
         with self._lock:
@@ -207,6 +288,7 @@ class BotManager:
             bots = {name: Bot.from_dict(self.server, name, bot.to_dict()) for name, bot in self.bots.items()}
             self._install(bots)
             self._generation += 1
+            self._request_name_save()
 
     def submit(self, callback, *args) -> Future:
         with self._lock:
@@ -230,11 +312,17 @@ class BotManager:
             return future
 
     def _task_done(self, future: Future) -> None:
+        error = None if future.cancelled() else future.exception()
         with self._lock:
             self._tasks.discard(future)
             self._slots.release()
-        if not future.cancelled() and future.exception() is not None:
-            self.server.logger.error(f'[BotKikai] 后台任务失败: {future.exception()}')
+            if future is self._name_save_future:
+                self._name_save_future = None
+                if error is not None:
+                    self._name_save_failed = True
+            self._request_name_save()
+        if error is not None:
+            self.server.logger.error(f'[BotKikai] 后台任务失败: {error}')
 
     def sync_online_status(self) -> bool:
         with self._lock:
@@ -250,7 +338,7 @@ class BotManager:
             if result is None:
                 self.server.logger.warning('[BotKikai] 在线列表查询超时，保留当前状态')
                 return False
-            players = {name.casefold() for name in result[2]}
+            players = {name.casefold(): name for name in result[2]}
         except Exception as error:
             self.server.logger.warning(f'[BotKikai] 无法同步在线列表，保留当前状态: {error}')
             return False
@@ -260,7 +348,10 @@ class BotManager:
             # 查询期间收到的加入/退出事件优先，旧快照不能覆盖它们。
             for key, (bot, version) in snapshot.items():
                 if self._real_names.get(key) is bot and self._status_versions[bot] == version:
+                    if key in players:
+                        self._confirm_name(bot, players[key])
                     self._set_online(bot, key in players)
+            self._request_name_save()
         return True
 
     def request_sync(self) -> Future | None:
@@ -273,10 +364,13 @@ class BotManager:
 
     def shutdown(self) -> None:
         with self._lock:
+            if self._closed:
+                return
             self._closed = True
             self._generation += 1
             for bot in self.bots.values():
                 bot.cancel()
+            self._flush_confirmed_names()
             tasks = list(self._tasks)
         for task in tasks:
             task.cancel()

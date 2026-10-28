@@ -16,10 +16,13 @@ def on_load(server: PluginServerInterface, old):
     global bot_manager_instance
     bot_manager_instance = BotManager(server)
     
-    # 在重载时保留在线列表
+    # 保留已知状态；旧版推算的名字不能当作服务端确认。
     if old is not None and hasattr(old, 'bot_manager_instance') and old.bot_manager_instance is not None:
-        for bot in old.bot_manager_instance.get_online_bots():
-            bot_manager_instance.update_player_status(bot.real_name, True)
+        for bot in old.bot_manager_instance.get_all_bots():
+            confirmed_name = getattr(bot, 'confirmed_name', None)
+            bot_manager_instance.update_player_status(
+                confirmed_name or bot.real_name, bot.is_online, confirm=confirmed_name is not None,
+            )
 
     register_command_tree(server, bot_manager_instance)
 
