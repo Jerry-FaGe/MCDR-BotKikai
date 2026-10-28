@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 import pytest
@@ -78,40 +77,79 @@ def test_json_round_trip_does_not_rewrite_string_whitespace(tmp_path):
     assert storage.read_json(path) == data
 
 
-def test_first_install_does_not_log_migration_error(env, caplog):
+def test_first_install_creates_default_files_without_backups(env, caplog):
     assert 'ERROR' not in caplog.text
-    assert Path(config.config_path).is_file()
-
-
-def test_migration_keeps_backup_and_resumes_after_partial_write(env):
-    old = {'SandBot': {'nicknames': ['farm'], 'position': [1, 64, 2]}}
-    storage.write_json(config.config_path, old)
-    storage.write_json(config.bots_path, old)
-    original = Path(config.config_path).read_bytes()
-    Path(config.config_path + '.bak').write_bytes(original)
-    config.init(env.server)
-    assert storage.read_json(config.bots_path) == old
     assert storage.read_json(config.config_path) == Config().to_dict()
-    assert Path(config.config_path + '.bak').read_bytes() == original
+    assert storage.read_json(config.bots_path) == {}
+    assert {path.name for path in env.path.iterdir()} == {'config.json', 'bots.json'}
 
 
-def test_migration_does_not_overwrite_existing_bots(env):
-    old = {'SandBot': {'nicknames': ['farm']}}
-    existing = {'OtherBot': {'nicknames': ['other']}}
+@pytest.mark.parametrize('record', [
+    {'nicknames': ['farm'], 'position': [1, 64, 2]},
+    {'nick': 'farm', 'dim': -1, 'pos': '1 64 2', 'facing': '90 0'},
+])
+@pytest.mark.parametrize('bots_state', ['missing', 'same', 'different', 'invalid'])
+@pytest.mark.parametrize('has_backups', [False, True])
+def test_old_config_layout_is_rejected_without_touching_files(env, record, bots_state, has_backups):
+    old = {'SandBot': record}
     storage.write_json(config.config_path, old)
-    storage.write_json(config.bots_path, existing)
-    with pytest.raises(ValueError):
+    if bots_state == 'missing':
+        Path(config.bots_path).unlink()
+    elif bots_state == 'same':
+        storage.write_json(config.bots_path, old)
+    elif bots_state == 'different':
+        storage.write_json(config.bots_path, {'OtherBot': {'nicknames': ['other']}})
+    else:
+        Path(config.bots_path).write_text('{', encoding='utf8')
+    if has_backups:
+        Path(config.config_path + '.bak').write_bytes(b'older backup')
+        Path(config.config_path + '.bak.1').write_bytes(Path(config.config_path).read_bytes())
+    config.spawn_max_wait_time = 5.0
+    settings = config.to_dict()
+    before = {path.name: path.read_bytes() for path in env.path.iterdir()}
+
+    with pytest.raises(ValueError, match=r'v0\.6\.0.*bots\.json'):
         config.init(env.server)
-    assert storage.read_json(config.config_path) == old
-    assert storage.read_json(config.bots_path) == existing
+
+    assert config.to_dict() == settings
+    assert {path.name: path.read_bytes() for path in env.path.iterdir()} == before
 
 
-def test_migration_does_not_replace_an_older_backup(env):
-    Path(config.bots_path).unlink()
-    old = {'SandBot': {'nick': 'farm'}}
-    storage.write_json(config.config_path, old)
-    backup = Path(config.config_path + '.bak')
-    backup.write_text('older backup', encoding='utf8')
+@pytest.mark.parametrize('mixed_settings', [False, True])
+def test_old_config_layout_reload_keeps_current_settings_and_bots(env, bot, mixed_settings):
+    bot.is_online = True
+    data = {'SandBot': bot.to_dict()}
+    if mixed_settings:
+        data['spawn_max_wait_time'] = 2.0
+    storage.write_json(config.config_path, data)
+    before = {path.name: path.read_bytes() for path in env.path.iterdir()}
+    settings = config.to_dict()
+
+    with pytest.raises(ValueError, match=r'v0\.6\.0.*bots\.json'):
+        env.manager.reload_config()
+
+    assert config.to_dict() == settings
+    assert env.manager.get_bot('SandBot') is bot
+    assert bot.is_online
+    assert bot.kill()
+    assert {path.name: path.read_bytes() for path in env.path.iterdir()} == before
+
+
+def test_split_config_keeps_legacy_bot_fields_and_existing_backups(env):
+    storage.write_json(config.config_path, {'spawn_max_wait_time': 5.0})
+    data = {'SandBot': {'nick': 'farm', 'dim': -1, 'pos': '1 64 2', 'facing': '90 0'}}
+    storage.write_json(config.bots_path, data)
+    Path(config.config_path + '.bak').write_bytes(b'older backup')
+    before = {path.name: path.read_bytes() for path in env.path.iterdir()}
+
     config.init(env.server)
-    assert backup.read_text(encoding='utf8') == 'older backup'
-    assert json.loads(Path(config.config_path + '.bak.1').read_text(encoding='utf8')) == old
+    env.manager.load()
+
+    bot = env.manager.get_bot('SandBot')
+    assert config.spawn_max_wait_time == 5.0
+    assert bot.nicknames == ['SandBot', 'farm']
+    assert bot.dimension == 'minecraft:the_nether'
+    assert bot.position == [1, 64, 2]
+    assert bot.facing == [90, 0]
+    assert bot.confirmed_name is None
+    assert {path.name: path.read_bytes() for path in env.path.iterdir()} == before

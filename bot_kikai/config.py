@@ -54,43 +54,9 @@ class Config:
         self.config_path = str(data_folder / 'config.json')
         self.bots_path = str(data_folder / 'bots.json')
 
-        self._migrate_old_config()
         if not Path(self.config_path).exists():
             write_json(self.config_path, Config().to_dict())
         self.load()
-    
-    def _migrate_old_config(self) -> None:
-        """迁移旧版本配置文件"""
-        if not self.config_path or not self.bots_path or not Path(self.config_path).exists():
-            return
-
-        old_data = read_json(self.config_path)
-        if not isinstance(old_data, dict) or any(key in old_data for key in self.FIELDS):
-            return
-        if not any(isinstance(value, dict) and ('nicknames' in value or 'nick' in value)
-                   for value in old_data.values()):
-            return
-
-        bots_path = Path(self.bots_path)
-        if bots_path.exists() and read_json(bots_path) != old_data:
-            raise ValueError('旧配置与已有 bots.json 不同，已取消迁移以保护现有数据')
-
-        original = Path(self.config_path).read_bytes()
-        backup = Path(self.config_path + '.bak')
-        suffix = 0
-        while backup.exists() and backup.read_bytes() != original:
-            suffix += 1
-            backup = Path(f'{self.config_path}.bak.{suffix}')
-        if not backup.exists():
-            with backup.open('xb') as stream:
-                stream.write(original)
-
-        # 已有的相同数据允许上次中断的迁移继续，但绝不覆盖不同的假人库。
-        if not bots_path.exists():
-            write_json(bots_path, old_data)
-        write_json(self.config_path, Config().to_dict())
-        if self.server:
-            self.server.logger.info(f'[BotKikai] 旧配置已迁移，备份保留在 {backup}')
 
     @classmethod
     def from_dict(cls, data: dict) -> 'Config':
@@ -98,6 +64,9 @@ class Config:
             raise ValueError('config.json 必须是 JSON 对象')
         unknown = set(data) - set(cls.FIELDS)
         if unknown:
+            if any(isinstance(data[key], dict) and ('nicknames' in data[key] or 'nick' in data[key])
+                   for key in unknown):
+                raise ValueError('config.json 不再支持旧版假人记录布局；请先备份，使用已发布的 v0.6.0 迁移到 bots.json 后再升级')
             raise ValueError(f'未知配置项: {", ".join(sorted(unknown))}')
         result = cls()
         for key in cls.FIELDS:
