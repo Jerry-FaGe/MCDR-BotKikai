@@ -1,5 +1,3 @@
-import math
-
 from mcdreforged.api.command import Literal, Text, Float, Integer
 from mcdreforged.api.types import PluginServerInterface, CommandSource, PlayerCommandSource
 
@@ -19,7 +17,7 @@ def list_bots(source: CommandSource, bot_manager: BotManager, status: str = 'all
             can_operate=source.has_permission(config.permission['bot']),
         )
     except ValueError as error:
-        source.reply(f'§b[BotKikai] §c列表参数无效: {error}')
+        source.reply(view.render_feedback(f'列表参数无效: {error}', kind='error'))
         return
     source.reply(message)
 
@@ -27,13 +25,10 @@ def reload_plugin(source: CommandSource, bot_manager: BotManager):
     try:
         bot_manager.reload_config()
     except (OSError, ValueError, RuntimeError) as error:
-        source.reply(f'§b[BotKikai] §c重载失败，原文件和当前状态已保留: {error}')
+        source.reply(view.render_feedback(f'重载失败，原文件和当前状态已保留: {error}', kind='error'))
         return
     bot_manager.request_sync()
-    if isinstance(source, PlayerCommandSource):
-        source.reply(f'§b[BotKikai] §a由{source.player}§a发起的配置文件重载成功')
-    else:
-        source.reply('§b[BotKikai] §a由控制台发起的配置文件重载成功')
+    source.reply(view.render_feedback('配置已重载', kind='success'))
 
 def _save_bot(source: CommandSource, context: dict, bot_manager: BotManager,
               pos, dim, facing, generation: int | None = None):
@@ -41,9 +36,10 @@ def _save_bot(source: CommandSource, context: dict, bot_manager: BotManager,
     try:
         added = bot_manager.upsert_bot(name, nickname, dim, pos, facing, generation)
     except (OSError, ValueError, RuntimeError) as error:
-        source.reply(f'§b[BotKikai] §c保存失败: {error}')
+        source.reply(view.render_feedback(f'保存失败: {error}', bot=bot_manager.get_bot(name), kind='error'))
         return
-    source.reply(f'§b[BotKikai] §a已{"添加" if added else "修改"}假人 §6{name} §d({nickname})')
+    source.reply(view.render_feedback('已添加记录' if added else '已更新记录',
+                                      bot=bot_manager.get_bot(name), kind='success'))
     bot_manager.request_sync()
 
 
@@ -54,21 +50,22 @@ def _add_bot_simple(source: PlayerCommandSource, context: dict, bot_manager: Bot
     if not bot_manager.is_active(generation):
         return
     if pos is None or dim is None or facing is None:
-        source.reply('§b[BotKikai] §c无法获取玩家位置；请检查玩家是否在线及 MinecraftDataAPI 的查询日志')
+        source.reply(view.render_feedback(
+            '无法获取玩家位置，请确认玩家在线', kind='error', details='请检查 MinecraftDataAPI 的查询日志'))
         return
     if not source.has_permission(config.permission['list']):
-        source.reply('§b[BotKikai] §c权限不足')
+        source.reply(view.render_feedback('权限不足', kind='error'))
         return
     _save_bot(source, context, bot_manager, pos, dim, facing, generation)
 
 def add_bot_simple(source: CommandSource, context: dict, bot_manager: BotManager):
     if not isinstance(source, PlayerCommandSource):
-        source.reply("§b[BotKikai] §c该指令只能由玩家执行")
+        source.reply(view.render_feedback('该指令只能由玩家执行', kind='error'))
         return
     try:
         return bot_manager.submit(_add_bot_simple, source, context, bot_manager, bot_manager.generation)
     except RuntimeError as error:
-        source.reply(f'§b[BotKikai] §c{error}')
+        source.reply(view.render_feedback(str(error), kind='error'))
 
 def add_bot_full(source: CommandSource, context: dict, bot_manager: BotManager):
     dim = utils.dimension_convert.get(context['dim'], context['dim'])
@@ -79,38 +76,45 @@ def add_bot_full(source: CommandSource, context: dict, bot_manager: BotManager):
 
 def del_bot(source: CommandSource, context: dict, bot_manager: BotManager):
     nickname = context["nickname"]
-    bot = bot_manager.get_bot_by_nickname(nickname)
+    bot = None
     try:
+        bot = bot_manager.get_bot_by_nickname(nickname)
         removed = bot is not None and bot_manager.remove_bot(bot.name)
     except (OSError, ValueError, RuntimeError) as error:
-        source.reply(f'§b[BotKikai] §c删除失败: {error}')
+        source.reply(view.render_feedback(f'删除失败: {error}', bot=bot, kind='error'))
         return
     if removed:
-        source.reply(f'§b[BotKikai] §a已删除假人 §6{bot.name}')
+        source.reply(view.render_feedback('已删除记录', bot=bot, kind='success', name_link=False,
+                                          details='只删除插件记录，不会让假人下线'))
     else:
-        source.reply(f"§b[BotKikai] §4未查询到 §6{nickname} §4对应的假人")
+        source.reply(view.render_feedback(f'未找到假人「{nickname}」', kind='error'))
 
 def edit_alias(source: CommandSource, context: dict, bot_manager: BotManager, *, remove: bool = False):
     if not source.has_permission(config.permission['list']):
-        source.reply('§b[BotKikai] §c权限不足')
+        source.reply(view.render_feedback('权限不足', kind='error'))
         return
     target, alias = context['nickname'], context['alias']
     method = bot_manager.remove_alias if remove else bot_manager.add_alias
+    bot = None
     try:
-        changed = method(target, alias)
+        bot = bot_manager.get_bot_by_nickname(target)
+        # Pin the resolved record even if its invoking alias is changed concurrently.
+        changed = method(bot.name if bot is not None else target, alias)
     except (OSError, ValueError, RuntimeError) as error:
-        source.reply(f'§b[BotKikai] §c别名修改失败: {error}')
+        source.reply(view.render_feedback(f'别名修改失败: {error}', bot=bot, kind='error'))
         return
+    # The alias used to invoke this command may just have been removed.
+    bot = bot_manager.get_bot(bot.name) if bot is not None else None
     if changed:
-        source.reply(f'§b[BotKikai] §a已为 §6{target} §a{"移除" if remove else "添加"}别名 §d{alias}')
+        source.reply(view.render_feedback(f'已{"移除" if remove else "添加"}别名「{alias}」', bot=bot, kind='success'))
     elif remove:
-        source.reply(f'§b[BotKikai] §7{target} 没有别名 {alias}，未作修改')
+        source.reply(view.render_feedback(f'没有别名「{alias}」，未作修改', bot=bot))
     else:
-        source.reply(f'§b[BotKikai] §7{target} 已可通过 {alias} 查找，无需重复添加')
+        source.reply(view.render_feedback(f'已可通过「{alias}」查找，无需重复添加', bot=bot))
 
 def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: BotManager, generation: int | None = None):
     if action == 'alias' and not source.has_permission(config.permission['list']):
-        source.reply('§b[BotKikai] §c权限不足')
+        source.reply(view.render_feedback('权限不足', kind='error'))
         return
     nickname = context['nickname']
     try:
@@ -118,7 +122,7 @@ def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: 
     except RuntimeError:
         return
     if not bot:
-        source.reply(f"§b[BotKikai] §4未查询到 §6{nickname} §4对应的假人")
+        source.reply(view.render_feedback(f'未找到假人「{nickname}」', kind='error'))
         return
 
     if action == 'info':
@@ -133,53 +137,51 @@ def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: 
         return
 
     if not source.has_permission(config.permission['bot']):
-        source.reply('§b[BotKikai] §c权限不足')
+        source.reply(view.render_feedback('权限不足', kind='error'))
         return
     
     executor = source.player if isinstance(source, PlayerCommandSource) else None
+    interval = 0
 
     try:
         if action == 'spawn':
             ok = bot.spawn(executor=executor)
-            message = '已确认上线'
         elif action == 'kill':
             ok = bot.kill()
-            message = '已发送下线请求'
         elif action == 'where':
             ok = bot.glowing(executor=executor)
-            message = f'已发送发光两分钟请求，记录坐标：{[math.floor(i) for i in bot.position]}'
         elif action in ('use', 'huse', 'atk', 'hatk'):
             use = action in ('use', 'huse')
             interval = context.get('use_interval' if use else 'atk_interval', 0)
             method = bot.use if use else bot.attack
             ok = method(continuous=action in ('huse', 'hatk'), interval=interval, executor=executor)
-            mode = f'每 {interval} gt' if interval else ('持续' if action.startswith('h') else '一次')
-            message = f'已发送{mode}{"右键" if use else "左键"}请求'
         elif action == 'stop':
             ok = bot.stop()
-            message = '已发送停止动作请求'
         else:
             raise ValueError(f'未知动作: {action}')
     except (OSError, ValueError, RuntimeError) as error:
-        source.reply(f'§b[BotKikai] §c操作失败: {error}')
+        source.reply(view.render_feedback(f'操作失败: {error}', bot=bot, kind='error'))
         return
     if not bot_manager.is_active(generation):
         return
     if ok:
-        source.reply(f'§b[BotKikai] §a假人 §6{bot.name} §d({nickname}) §a{message}')
+        source.reply(view.render_action_feedback(bot, action, interval=interval))
     else:
-        source.reply(f'§b[BotKikai] §c假人 {bot.name} 操作失败或已取消；请检查服务器状态、召唤超时及 Carpet 日志')
+        source.reply(view.render_feedback(
+            '操作未完成；请检查状态或日志', bot=bot, kind='error',
+            details='动作接口未返回具体原因，无法区分服务器未运行、上线未确认或取消；请检查 MCDR / Carpet 日志',
+        ))
 
 def bot_action(source: CommandSource, context: dict, action: str, bot_manager: BotManager):
     if action in ('info', 'alias'):
         return _bot_action(source, context, action, bot_manager, bot_manager.generation)
     if not source.has_permission(config.permission['bot']):
-        source.reply('§b[BotKikai] §c权限不足')
+        source.reply(view.render_feedback('权限不足', kind='error'))
         return None
     try:
         return bot_manager.submit(_bot_action, source, context, action, bot_manager, bot_manager.generation)
     except RuntimeError as error:
-        source.reply(f'§b[BotKikai] §c{error}')
+        source.reply(view.render_feedback(str(error), kind='error'))
 
 
 def register_command_tree(server: PluginServerInterface, bot_manager: BotManager):

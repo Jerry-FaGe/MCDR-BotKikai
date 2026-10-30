@@ -120,7 +120,7 @@ def test_failed_action_does_not_reply_success(env, bot):
     config.spawn_max_wait_time = 0.01
     task = command.bot_action(env.source, {'nickname': 'farm'}, 'use', env.manager)
     task.result(timeout=2)
-    assert '\u5931\u8d25' in env.source.messages[-1]
+    assert '\u64cd\u4f5c\u672a\u5b8c\u6210' in env.source.messages[-1]
     assert '\u5df2\u53d1\u9001' not in env.source.messages[-1]
     assert all(' use ' not in text for text in env.server.commands)
 
@@ -252,7 +252,7 @@ def test_alias_commands_work_without_minecraft_queries_or_bot_actions(env, bot, 
     monkeypatch.setattr(env.manager, 'request_sync', fail)
     run_command(root, source, f'{prefix} farm alias add \u6c99\u573a')
     assert env.manager.get_bot_by_nickname('\u6c99\u573a') is bot
-    assert '\u5df2\u4e3a' in source.messages[-1]
+    assert '\u5df2\u6dfb\u52a0\u522b\u540d' in source.messages[-1]
     run_command(root, source, f'{prefix} \u6c99\u573a alias del FARM')
     assert env.manager.get_bot_by_nickname('farm') is None
     assert bot.position == [1.5, 64, -2.5]
@@ -334,7 +334,7 @@ def test_failed_alias_save_does_not_reply_success(env, bot, monkeypatch):
     run_command(env.server.roots[0], env.source, '!!bk farm alias add new')
     assert 'disk full' in env.source.messages[-1]
     assert '\u522b\u540d\u4fee\u6539\u5931\u8d25' in env.source.messages[-1]
-    assert '\u5df2\u4e3a' not in env.source.messages[-1]
+    assert '\u5df2\u6dfb\u52a0\u522b\u540d' not in env.source.messages[-1]
     assert env.manager.get_bot_by_nickname('new') is None
 
 
@@ -382,7 +382,7 @@ def test_alias_panel_handles_missing_record_and_changed_permission(env, bot):
     command.register_command_tree(env.server, env.manager)
     root = env.server.roots[0]
     run_command(root, env.source, '!!bk missing alias')
-    assert '\u672a\u67e5\u8be2\u5230' in env.source.messages[-1]
+    assert '\u672a\u627e\u5230\u5047\u4eba' in env.source.messages[-1]
 
     env.source.permission = 2
     config.permission['list'] = 2
@@ -432,7 +432,7 @@ def test_panel_commands_round_trip_and_old_panels_cannot_bypass_permissions(env,
     with pytest.raises(CommandError):
         run_command(root, env.source, remove_farm)
     run_command(root, env.source, detail['[\u53f3\u952e]'])
-    assert '\u6743\u9650\u4e0d\u8db3' in messages[-1]
+    assert '\u6743\u9650\u4e0d\u8db3' in messages[-1].to_plain_text()
     assert env.manager.get_bot('SandBot') is bot
     assert env.server.commands == []
 
@@ -616,13 +616,13 @@ def test_list_actions_target_exact_records_and_recheck_current_permissions(env, 
     assert actions == expected
 
     run_command(root, env.source, '!!bk Sand use')
-    assert '\u672a\u67e5\u8be2\u5230' in messages[-1]
+    assert '\u672a\u627e\u5230\u5047\u4eba' in messages[-1].to_plain_text()
     assert actions == expected
     config.permission['bot'] = 4
     env.source.permission = 3
     for label in labels:
         run_command(root, env.source, buttons[label])
-        assert '\u6743\u9650\u4e0d\u8db3' in messages[-1]
+        assert '\u6743\u9650\u4e0d\u8db3' in messages[-1].to_plain_text()
     assert actions == expected
     assert env.server.commands == []
 
@@ -663,10 +663,10 @@ def test_offline_list_use_waits_for_spawn_confirmation(env, bot, monkeypatch, ac
     if acknowledge_spawn:
         assert len(env.server.commands) == 2
         assert env.server.commands[1] == 'player sandbot use once'
-        assert '\u5df2\u53d1\u9001\u4e00\u6b21\u53f3\u952e\u8bf7\u6c42' in messages[-1]
+        assert '\u53f3\u952e\u8bf7\u6c42\u5df2\u53d1\u9001' in messages[-1].to_plain_text()
     else:
         assert len(env.server.commands) == 1
-        assert '\u64cd\u4f5c\u5931\u8d25' in messages[-1]
+        assert '\u64cd\u4f5c\u672a\u5b8c\u6210' in messages[-1].to_plain_text()
 
 
 @pytest.mark.parametrize('name', ['search', 'online', 'offline'])

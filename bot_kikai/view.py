@@ -1,10 +1,10 @@
-"""Read-only rendering for plugin help and bot panels."""
+"""Read-only rendering for plugin help, bot panels and command feedback."""
 
 from __future__ import annotations
 
 import math
 import unicodedata
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from mcdreforged.api.rtext import RText, RTextList, RAction, RColor
 
@@ -17,6 +17,12 @@ if TYPE_CHECKING:
 LIST_PAGE_SIZE = 10
 LIST_NAME_LIMIT = 7
 _LIST_STATUSES = {'all': '全部', 'online': '在线', 'offline': '离线'}
+_FEEDBACK_COLORS = {
+    'success': RColor.green,
+    'request': RColor.white,
+    'info': RColor.gray,
+    'error': RColor.red,
+}
 
 # Vanilla 1.21.4 bitmap advances include the one-pixel gap after each glyph.
 # Most ASCII glyphs advance 6 pixels; CJK glyphs advance 9 and spaces 4.
@@ -119,13 +125,14 @@ def _number(value: float) -> str:
     return '0' if text == '-0' else text
 
 
-def _record_details(bot: Bot, *, coordinate_link: bool = False) -> RTextList:
+def _record_position(bot: Bot, *, coordinate_link: bool = False, block_coordinates: bool = False) -> RText:
     dimension = {
         'minecraft:overworld': '主世界',
         'minecraft:the_nether': '下界',
         'minecraft:the_end': '末地',
     }.get(bot.dimension, bot.dimension)
-    position = RText(f'{dimension} ({", ".join(_number(v) for v in bot.position)})',
+    coordinates = ', '.join(str(math.floor(v)) if block_coordinates else _number(v) for v in bot.position)
+    position = RText(f'{dimension} ({coordinates})',
                      RColor.aqua if coordinate_link else RColor.white)
     if coordinate_link:
         # Share the original block position, never the rounded display coordinates.
@@ -135,14 +142,75 @@ def _record_details(bot: Bot, *, coordinate_link: bool = False) -> RTextList:
             RText('\n这是登记的召唤位置，不是实时位置', RColor.yellow),
             RText('\n点击填入方块坐标点，按回车发送', RColor.gray),
         )
+    return position
+
+
+def _record_details(bot: Bot, *, coordinate_link: bool = False) -> RTextList:
     facing = RText(' / '.join(_number(v) for v in bot.facing), RColor.white).h(
         RText(f'水平角 (yaw) / 俯仰角 (pitch)\n原始朝向: {bot.facing}', RColor.white))
     return RTextList(
         _display_player_name(bot),
         RText('\n别名: ', RColor.gray), _display_nicknames(bot),
-        RText('\n登记位置: ', RColor.gray), position,
+        RText('\n登记位置: ', RColor.gray), _record_position(bot, coordinate_link=coordinate_link),
         RText('\n登记朝向: ', RColor.gray), facing,
     )
+
+
+def render_feedback(message: str, *, bot: Bot | None = None,
+                    kind: Literal['success', 'request', 'info', 'error'] = 'info',
+                    details: str | None = None, name_link: bool = True) -> RTextList:
+    if kind not in _FEEDBACK_COLORS:
+        raise ValueError('未知的反馈类型')
+    result = RTextList(RText('[BK] ', RColor.aqua))
+    if bot is not None:
+        name = _display_name(bot)
+        hover = RTextList(
+            RText('显示名: ', RColor.gray), RText(name, RColor.gold),
+            RText('\n登记名: ', RColor.gray), RText(bot.name, RColor.white),
+            '\n', _display_player_name(bot),
+            RText('\n别名: ', RColor.gray), _display_nicknames(bot),
+        )
+        label = RText(name, RColor.gold)
+        if name_link:
+            label.c(RAction.suggest_command, f'{config.prefix_short} {bot.name}')
+            hover.append(RText('\n点击填入详情命令，按回车查看', RColor.gray))
+        result.append(label.h(hover), RText(' · ', RColor.gray))
+    # Keep console-visible causes intact without injecting extra chat lines.
+    compact = ' '.join(line.strip() for line in message.replace('\t', ' ').splitlines())
+    body = RText(compact, _FEEDBACK_COLORS[kind])
+    if details or compact != message:
+        hover = RTextList(RText(message, RColor.white))
+        if details:
+            hover.append('\n', RText(details, RColor.gray))
+        body.h(hover)
+    result.append(body)
+    return result
+
+
+def render_action_feedback(bot: Bot, action: str, *, interval: int = 0) -> RTextList:
+    if action in ('use', 'huse', 'atk', 'hatk'):
+        continuous = action in ('huse', 'hatk')
+        mode = (f'每 {interval} gt ' if interval else '持续') if continuous else ''
+        interaction = '右键' if action in ('use', 'huse') else '左键'
+        message = f'{mode}{interaction}请求已发送'
+    else:
+        messages = {
+            'spawn': '已确认上线',
+            'kill': '下线请求已发送',
+            'stop': '停止动作请求已发送',
+            'where': '发光请求已发送（2 分钟）',
+        }
+        if action not in messages:
+            raise ValueError(f'未知动作: {action}')
+        message = messages[action]
+    result = render_feedback(
+        message, bot=bot, kind='success' if action == 'spawn' else 'request',
+        details=None if action == 'spawn' else '这里只确认请求已发送，实际动作或效果请以游戏内结果为准',
+    )
+    if action == 'where':
+        result.append(RText(' · 登记位置: ', RColor.gray),
+                      _record_position(bot, coordinate_link=True, block_coordinates=True))
+    return result
 
 
 def render_bot_actions(bot: Bot) -> RTextList:

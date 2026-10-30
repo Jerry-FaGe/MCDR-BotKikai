@@ -139,6 +139,8 @@ def test_rendering_does_not_change_bot_state_or_saved_data(env, bot, online):
     view.render_alias_panel(bot)
     view.render_bot_summary(bot)
     view.render_bot_list([bot])
+    view.render_feedback('done', bot=bot, kind='success')
+    view.render_action_feedback(bot, 'where')
     env.source.permission = 0
     command.bot_action(env.source, {'nickname': 'farm'}, 'info', env.manager)
 
