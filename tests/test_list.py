@@ -159,6 +159,138 @@ def test_list_names_keep_seven_characters_before_ellipsis(env, name):
     assert name in view.render_bot_info(bot).to_plain_text()
 
 
+def test_chat_width_matches_vanilla_ascii_and_cjk_advances():
+    # Independent advances for U+0020..U+007E from the vanilla 1.21.4 font.
+    advances = (
+        4, 2, 4, 6, 6, 6, 6, 2, 4, 4, 4, 6, 2, 6, 2, 6,
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 2, 2, 5, 6, 5, 6,
+        7, 6, 6, 6, 6, 6, 6, 6, 6, 4, 6, 6, 6, 6, 6, 6,
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 4, 6, 4, 6, 6,
+        3, 6, 6, 6, 6, 6, 5, 6, 6, 2, 6, 5, 3, 6, 6, 6,
+        6, 6, 6, 6, 4, 6, 6, 6, 6, 6, 6, 4, 2, 4, 7,
+    )
+    assert len(advances) == 95
+    for codepoint, width in enumerate(advances, 32):
+        assert view._chat_text_width(chr(codepoint)) == width, chr(codepoint)
+    assert view._chat_text_width('') == 0
+    assert view._chat_text_width('\u5237\u6c99\u673a') == 27
+    assert view._chat_text_width('\uff21\uff22\uff23') == 27
+    assert view._chat_text_width('\u2026') == 8
+    assert view._chat_text_width('farm\u673a\u5668\u4eba\u2026') == 58
+
+
+@pytest.mark.parametrize('online', [False, True])
+@pytest.mark.parametrize('can_operate', [False, True])
+@pytest.mark.parametrize('name, visible_width', [
+    ('i', 2), ('l', 3), ('I', 4), ('f', 5), ('W', 6), ('@', 7),
+    ('iiiiiii', 14), ('WWWWWWW', 42), ('iiiiiiii', 22), ('WWWWWWWW', 50),
+    ('0123456', 42), ('[]{}()!', 26), ('SandBot', 40), ('farm', 23),
+    ('\u5237\u6c99\u673a', 27), ('\u673a' * 7, 63), ('\u673a' * 8, 71),
+    ('farm\u673a\u5668\u4eba', 50), ('farm\u673a\u5668\u4eba\u5854', 58),
+])
+def test_name_padding_aligns_row_buttons_using_visible_glyph_width(env, online, can_operate, name, visible_width):
+    bot = Bot(env.server, 'SandBot', [name], 'minecraft:overworld', [0, 64, 0], [0, 0])
+    bot.is_online = online
+    short_name = name if len(name) <= 7 else name[:7] + '\u2026'
+    status = '\u5728\u7ebf' if online else '\u79bb\u7ebf'
+    text = view.render_bot_summary(bot, can_operate=can_operate, name_width=71).to_plain_text()
+    head = f'[{status}] {short_name}'
+    assert text.startswith(head)
+    spacing, buttons = text[len(head):].split('[', 1)
+    assert spacing and set(spacing) == {' '}
+
+    # Status + separator = 30px; name slot = 71px; button separator = 4px.
+    button_start = 30 + visible_width + len(spacing) * 4
+    assert 104 <= button_start <= 107
+    action = '\u4e0b\u7ebf' if online else '\u4e0a\u7ebf'
+    expected = f'[{action}] [\u53f3\u952e] [\u8be6\u60c5]' if can_operate else '[\u8be6\u60c5]'
+    assert '[' + buttons == expected
+
+
+@pytest.mark.parametrize('name', ['i', '\u673a' * 7, '\u673a' * 8])
+def test_name_padding_is_not_part_of_the_name_hover_or_button(env, name):
+    bot = Bot(env.server, 'SandBot', [name], 'minecraft:overworld', [0, 64, 0], [0, 0])
+    message = view.render_bot_summary(bot, name_width=71)
+
+    def visible_nodes(value):
+        if isinstance(value, dict):
+            yield value
+            yield from visible_nodes(value.get('extra', []))
+        elif isinstance(value, list):
+            for child in value:
+                yield from visible_nodes(child)
+
+    nodes = [node for node in visible_nodes(json.loads(message.to_json_str())) if node.get('text')]
+    name_index = next(index for index, node in enumerate(nodes) if node.get('color') == 'gold')
+    button_index = next(index for index, node in enumerate(nodes) if 'clickEvent' in node)
+    padding = nodes[name_index + 1:button_index]
+    assert padding
+    assert all(set(node['text']) == {' '} for node in padding)
+    assert all('hoverEvent' not in node and 'clickEvent' not in node for node in padding)
+    assert 'hoverEvent' in nodes[name_index]
+    assert 'clickEvent' not in nodes[name_index]
+
+
+@pytest.mark.parametrize('can_operate', [False, True])
+@pytest.mark.parametrize('options, indices, name_width', [
+    ({'page': 1}, list(range(10)), 8),
+    ({'page': 2}, list(range(10, 20)), 71),
+    ({'page': 3}, [20], 18),
+    ({'page': 99}, [20], 18),
+    ({'status': 'online'}, list(range(0, 20, 2)), 71),
+    ({'status': 'online', 'page': 2}, [20], 18),
+    ({'status': 'offline'}, list(range(1, 20, 2)), 71),
+    ({'query': 'MATCH'}, list(range(10)), 8),
+    ({'query': 'Bot000'}, [0], 8),
+    ({'query': 'WWW'}, [20], 18),
+    ({'status': 'online', 'query': 'i'}, [0, 2, 4, 6, 8], 8),
+])
+def test_alignment_uses_only_current_page_after_filtering(env, can_operate, options, indices, name_width):
+    bots = _bots(env, 21)
+    for index, bot in enumerate(bots):
+        if index < 10:
+            alias = f'i{index}'
+        elif index < 20:
+            alias = '\u673a' * 8 + str(index)
+        else:
+            alias = 'WWW'
+        bot.nicknames += [alias, 'match']
+    message = view.render_bot_list(bots, can_operate=can_operate, **options)
+    rows = [line for line in message.to_plain_text().splitlines()
+            if line.startswith(('[\u5728\u7ebf]', '[\u79bb\u7ebf]'))]
+    assert rows == [view.render_bot_summary(
+        bots[index], can_operate=can_operate, name_width=name_width).to_plain_text() for index in indices]
+    assert _commands(message, '[\u8be6\u60c5]') == [f'!!bk {bots[index].name}' for index in indices]
+
+
+@pytest.mark.parametrize('can_operate', [False, True])
+def test_short_machine_names_do_not_reserve_the_seven_character_limit(env, can_operate):
+    names = ['\u56de\u5bb6', '\u7ea2\u77f3\u706f', '\u653b\u51fb', '\u5237\u6c99\u673a', '\u949f']
+    bots = _bots(env, len(names))
+    for bot, name in zip(bots, names):
+        bot.nicknames += [name]
+    message = view.render_bot_list(bots, can_operate=can_operate)
+    rows = [line for line in message.to_plain_text().splitlines()
+            if line.startswith(('[\u5728\u7ebf]', '[\u79bb\u7ebf]'))]
+    # A 27px name column needs only these ordinary spaces, including the separator.
+    assert len(rows) == len(names)
+    for row, name, spaces in zip(rows, names, [3, 1, 3, 1, 6]):
+        assert row[5:].startswith(name + ' ' * spaces + '[')
+
+
+@pytest.mark.parametrize('name', ['i', '\u673a' * 7, '\u673a' * 8])
+def test_standalone_summary_has_no_artificial_name_column(env, name):
+    bot = Bot(env.server, 'SandBot', [name], 'minecraft:overworld', [0, 64, 0], [0, 0])
+    label = name if len(name) <= 7 else name[:7] + '\u2026'
+    assert view.render_bot_summary(bot, can_operate=False).to_plain_text() == f'[\u79bb\u7ebf] {label} [\u8be6\u60c5]'
+
+
+def test_name_padding_never_expands_already_full_or_oversized_names():
+    assert view._list_name_padding('\u673a' * 7 + '\u2026', 71) == ''
+    assert view._list_name_padding('W' * 100, 71) == ''
+    assert view._list_name_padding('farm', 0) == ''
+
+
 def test_long_query_is_preserved_in_navigation_and_hover(env, bot):
     query = '\u5237\u6c99\u673a' * 20
     message = view.render_bot_list([bot], query=query)

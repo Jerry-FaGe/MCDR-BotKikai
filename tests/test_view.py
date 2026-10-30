@@ -94,7 +94,8 @@ def test_list_sorts_records_without_reordering_input(env, bot):
     result = view.render_bot_list(bots)
 
     rows = [line for line in result.to_plain_text().splitlines() if line.startswith('[\u79bb\u7ebf]')]
-    assert rows == [view.render_bot_summary(other).to_plain_text(), view.render_bot_summary(bot).to_plain_text()]
+    assert rows == [view.render_bot_summary(other, name_width=48).to_plain_text(),
+                    view.render_bot_summary(bot, name_width=48).to_plain_text()]
     assert bots == [bot, other]
 
 

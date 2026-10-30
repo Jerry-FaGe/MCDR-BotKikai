@@ -18,6 +18,17 @@ LIST_PAGE_SIZE = 10
 LIST_NAME_LIMIT = 7
 _LIST_STATUSES = {'all': '全部', 'online': '在线', 'offline': '离线'}
 
+# Vanilla 1.21.4 bitmap advances include the one-pixel gap after each glyph.
+# Most ASCII glyphs advance 6 pixels; CJK glyphs advance 9 and spaces 4.
+_CHAT_GLYPH_WIDTHS = {
+    char: width
+    for width, chars in (
+        (2, "!.,:;'i|"), (3, '`l'), (4, ' "()*I[]t{}'),
+        (5, '<>fk'), (7, '@~'), (8, '…'),
+    )
+    for char in chars
+}
+
 
 HELP_HEAD = """
 ================== §bBotKikai §r==================
@@ -225,11 +236,29 @@ def _short_label(text: str, width: int = 24) -> str:
     return text
 
 
-def render_bot_summary(bot: Bot, *, can_operate: bool = True, online: bool | None = None) -> RTextList:
+def _chat_text_width(text: str) -> int:
+    # Estimate the unstyled default font, not resource packs or the uniform font.
+    return sum(_CHAT_GLYPH_WIDTHS.get(char, 9 if unicodedata.east_asian_width(char) in 'WF' else 6)
+               for char in text)
+
+
+def _short_list_name(name: str) -> str:
+    return name if len(name) <= LIST_NAME_LIMIT else name[:LIST_NAME_LIMIT] + '…'
+
+
+def _list_name_padding(name: str, width: int) -> str:
+    space_width = _CHAT_GLYPH_WIDTHS[' ']
+    remaining = width - _chat_text_width(name)
+    # Round to the nearest ordinary space; the button keeps its own separator.
+    return ' ' * max(0, (remaining + space_width // 2) // space_width)
+
+
+def render_bot_summary(bot: Bot, *, can_operate: bool = True, online: bool | None = None,
+                       name_width: int = 0) -> RTextList:
     online = bot.is_online if online is None else online
     prefix = f'{config.prefix_short} {bot.name}'
     name = _display_name(bot)
-    short_name = name if len(name) <= LIST_NAME_LIMIT else name[:LIST_NAME_LIMIT] + '…'
+    short_name = _short_list_name(name)
     hover = RTextList(
         RText(name, RColor.gold), RText(f'\n登记名: {bot.name}\n', RColor.gray),
         _record_details(bot),
@@ -238,6 +267,7 @@ def render_bot_summary(bot: Bot, *, can_operate: bool = True, online: bool | Non
     result = RTextList(
         RText('[', RColor.gray), _online_status(online), RText('] ', RColor.gray),
         RText(short_name, RColor.gold).h(hover),
+        _list_name_padding(short_name, name_width),
     )
     if can_operate:
         if online:
@@ -308,8 +338,12 @@ def render_bot_list(bots: list[Bot], *, status: str = 'all', query: str | None =
         result.append(RText('\n页码超出范围，已显示最后一页', RColor.yellow))
     if total:
         start = (page - 1) * LIST_PAGE_SIZE
-        for bot, online in rows[start:start + LIST_PAGE_SIZE]:
-            result.append('\n', render_bot_summary(bot, can_operate=can_operate, online=online))
+        page_rows = rows[start:start + LIST_PAGE_SIZE]
+        # Only names actually shown on this page should determine its column width.
+        name_width = max(_chat_text_width(_short_list_name(_display_name(bot))) for bot, _ in page_rows)
+        for bot, online in page_rows:
+            result.append('\n', render_bot_summary(
+                bot, can_operate=can_operate, online=online, name_width=name_width))
     elif not bots:
         result.append(RText('\n尚未登记假人，可查看帮助了解添加方式', RColor.gray))
     elif query is not None:
