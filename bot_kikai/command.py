@@ -4,7 +4,6 @@ from mcdreforged.api.command import Literal, Text, Float, Integer
 from mcdreforged.api.types import PluginServerInterface, CommandSource, PlayerCommandSource
 
 from .bot_manager import BotManager
-from .bot import Bot
 from .config import config
 from . import utils, view
 
@@ -12,17 +11,17 @@ from . import utils, view
 def show_help(source: CommandSource):
     source.reply(view.render_help())
 
-def list_bots(source: CommandSource, bot_manager: BotManager, status: str = 'all'):
-    bots_to_show: list[Bot] = []
-    if status == 'online':
-        bots_to_show = bot_manager.get_online_bots()
-    elif status == 'offline':
-        bots_to_show = bot_manager.get_offline_bots()
-    else:
-        bots_to_show = bot_manager.get_all_bots()
-
-    source.reply(view.render_bot_list(
-        bots_to_show, can_operate=source.has_permission(config.permission['bot'])))
+def list_bots(source: CommandSource, bot_manager: BotManager, status: str = 'all', *,
+              query: str | None = None, page: int = 1):
+    try:
+        message = view.render_bot_list(
+            bot_manager.get_all_bots(), status=status, query=query, page=page,
+            can_operate=source.has_permission(config.permission['bot']),
+        )
+    except ValueError as error:
+        source.reply(f'§b[BotKikai] §c列表参数无效: {error}')
+        return
+    source.reply(message)
 
 def reload_plugin(source: CommandSource, bot_manager: BotManager):
     try:
@@ -244,13 +243,21 @@ def register_command_tree(server: PluginServerInterface, bot_manager: BotManager
         Text('nickname').runs(lambda src, ctx: del_bot(src, ctx, bot_manager))
     )
 
-    list_node = Literal('list').runs(
-        lambda src: list_bots(src, bot_manager, 'all')
-    ).then(
-        Literal('online').runs(lambda src: list_bots(src, bot_manager, 'online'))
-    ).then(
-        Literal('offline').runs(lambda src: list_bots(src, bot_manager, 'offline'))
-    )
+    def list_branch(literal: str, status: str) -> Literal:
+        def show(src, ctx):
+            return list_bots(src, bot_manager, status, query=ctx.get('query'), page=ctx.get('page', 1))
+
+        return Literal(literal).runs(show).then(
+            Integer('page').at_min(1).runs(show)
+        ).then(
+            Literal('search').then(
+                Text('query').runs(show).then(Integer('page').at_min(1).runs(show))
+            )
+        )
+
+    list_node = list_branch('list', 'all').then(
+        list_branch('online', 'online')
+    ).then(list_branch('offline', 'offline'))
 
     root = Literal(config.prefix_short).runs(show_help).then(
         list_node

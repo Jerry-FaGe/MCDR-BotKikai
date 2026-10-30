@@ -35,7 +35,10 @@ def test_action_buttons_preserve_commands_and_online_controls(env, bot, online, 
     expected = [f'{prefix} SandBot {action}' for action in actions]
 
     assert _click_commands(view.render_bot_actions(bot)) == expected
-    assert _click_commands(view.render_bot_summary(bot)) == [*expected, f'{prefix} SandBot']
+    summary_actions = ['kill', 'use'] if online else ['spawn', 'use']
+    assert _click_commands(view.render_bot_summary(bot)) == [
+        *(f'{prefix} SandBot {action}' for action in summary_actions), f'{prefix} SandBot',
+    ]
     assert _click_commands(view.render_bot_info(bot)) == [
         '[x:1, y:64, z:-3, name:SandBot, dim:minecraft:overworld]',
         *expected,
@@ -56,12 +59,8 @@ def test_panels_hide_identity_aliases_and_preserve_nickname_order(env, renderer)
               ['SANDBOT', 'b_SANDBOT', 'farm', '\u5237\u6c99\u673a'],
               'minecraft:overworld', [1.5, 64, -2.5], [180, 0])
     nicknames = bot.nicknames.copy()
-    text = renderer(bot).to_plain_text()
-    aliases = next(line for line in text.splitlines() if '\u522b\u540d:' in line)
-
-    assert 'farm\u3001\u5237\u6c99\u673a' in aliases
-    assert 'SANDBOT' not in aliases
-    assert 'b_sandbot' not in aliases.lower()
+    nodes = _json_nodes(json.loads(renderer(bot).to_json_str()))
+    assert any(node.get('text') == 'farm\u3001\u5237\u6c99\u673a' for node in nodes)
     assert bot.nicknames == nicknames
 
 
@@ -70,7 +69,8 @@ def test_help_reads_current_prefix_and_preserves_templates(env):
     config.prefix_short = '!!farm'
     current = view.render_help()
     templates = [
-        '', ' list [online|offline]', ' reload',
+        '', ' list [online|offline] [page]',
+        ' list [online|offline] search <\u5173\u952e\u8bcd> [page]', ' reload',
         ' add <name> <kikai>', ' add <name> <kikai> <dim> <pos> <facing>',
         ' del <kikai>', ' <kikai> alias', ' <kikai> alias add <alias>', ' <kikai> alias del <alias>',
         ' <kikai>', ' <kikai> spawn', ' <kikai> kill',
@@ -88,21 +88,21 @@ def test_help_reads_current_prefix_and_preserves_templates(env):
     assert env.source.messages == [current.to_plain_text()]
 
 
-def test_list_preserves_input_order_and_separators(env, bot):
+def test_list_sorts_records_without_reordering_input(env, bot):
     other = Bot(env.server, 'OtherBot', [], 'minecraft:the_nether', [0, 70, 0], [0, 0])
-    bots = [other, bot]
+    bots = [bot, other]
     result = view.render_bot_list(bots)
 
-    assert result.to_plain_text() == (
-        view.render_bot_summary(other).to_plain_text() + '\n'
-        + view.render_bot_summary(bot).to_plain_text() + '\n'
-    )
-    assert bots == [other, bot]
+    rows = [line for line in result.to_plain_text().splitlines() if line.startswith('[\u79bb\u7ebf]')]
+    assert rows == [view.render_bot_summary(other).to_plain_text(), view.render_bot_summary(bot).to_plain_text()]
+    assert bots == [bot, other]
 
 
-def test_empty_list_keeps_existing_reply(env):
-    expected = '\u00a7b[BotKikai] \u00a77\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u5047\u4eba'
-    assert view.render_bot_list([]) == expected
+def test_empty_list_keeps_navigation_and_explains_missing_records(env):
+    expected = view.render_bot_list([]).to_plain_text()
+    assert '\u5c1a\u672a\u767b\u8bb0\u5047\u4eba' in expected
+    assert '[\u641c\u7d22]' in expected
+    assert '[\u5e2e\u52a9]' in expected
     command.list_bots(env.source, env.manager)
     assert env.source.messages == [expected]
 
@@ -120,7 +120,7 @@ def test_list_command_keeps_status_filtering(env, bot, status, expected_names):
     command.list_bots(env.source, env.manager, status)
 
     expected_bots = [env.manager.get_bot(name) for name in expected_names]
-    assert env.source.messages == [view.render_bot_list(expected_bots).to_plain_text()]
+    assert env.source.messages == [view.render_bot_list(expected_bots, status=status).to_plain_text()]
 
 
 @pytest.mark.parametrize('online', [False, True])
