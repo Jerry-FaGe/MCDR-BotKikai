@@ -178,11 +178,22 @@ def test_plugin_reload_preserves_online_names_after_unload(env, bot):
 
 
 def test_coordinates_use_suggest_instead_of_non_slash_run_command(env, bot):
-    data = json.loads(bot.get_info_rtext().to_json_str())
-    serialized = json.dumps(data)
-    assert 'run_command' not in serialized
-    assert 'suggest_command' in serialized
-    assert 'z:-3' in serialized
+    def events(value):
+        if isinstance(value, dict):
+            if 'clickEvent' in value:
+                yield value['clickEvent']
+            for child in value.values():
+                yield from events(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from events(child)
+
+    clicks = events(json.loads(bot.get_info_rtext().to_json_str()))
+    coordinates = [event for event in clicks if event['value'].startswith('[x:')]
+    assert coordinates == [{
+        'action': 'suggest_command',
+        'value': '[x:1, y:64, z:-3, name:SandBot, dim:minecraft:overworld]',
+    }]
 
 
 def test_add_queries_one_consistent_player_snapshot(env, monkeypatch):
@@ -519,7 +530,7 @@ def _panel_buttons(message):
     def visit(value):
         if isinstance(value, dict):
             if 'clickEvent' in value:
-                assert value['clickEvent']['action'] == 'suggest_command'
+                assert value['clickEvent']['action'] in ('run_command', 'suggest_command')
                 yield value['text'], value['clickEvent']['value']
             for child in value.values():
                 yield from visit(child)

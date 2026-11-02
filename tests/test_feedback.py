@@ -25,7 +25,9 @@ def _visible(message):
 
 def _commands(message):
     events = [node['clickEvent'] for node in _nodes(json.loads(message.to_json_str())) if 'clickEvent' in node]
-    assert all(event['action'] == 'suggest_command' for event in events)
+    for event in events:
+        expected = 'suggest_command' if event['value'].startswith('[x:') else 'run_command'
+        assert event['action'] == expected
     return [event['value'] for event in events]
 
 
@@ -64,6 +66,8 @@ def test_feedback_uses_full_first_custom_alias_and_registered_name_link(env, pre
     assert ('\u5f85\u786e\u8ba4' in hover) is not confirmed
     assert '\u767b\u8bb0\u540d:' in hover and '\u5047\u4eba\u540d:' in hover
     assert all(alias in hover for alias in view._custom_aliases(bot))
+    assert '\u70b9\u51fb\u67e5\u770b\u8be6\u60c5' in hover
+    assert '\u56de\u8f66' not in hover
     assert _commands(message) == [f'{prefix} SandBot']
     assert bot.to_dict() == before
     assert env.server.commands == []

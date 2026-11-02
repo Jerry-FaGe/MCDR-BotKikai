@@ -23,7 +23,9 @@ def _text_nodes(message):
 
 def _commands(message, label=None):
     nodes = [node for node in _text_nodes(message) if 'clickEvent' in node]
-    assert all(node['clickEvent']['action'] == 'suggest_command' for node in nodes)
+    for node in nodes:
+        expected = 'suggest_command' if node['text'] == '[\u641c\u7d22]' else 'run_command'
+        assert node['clickEvent']['action'] == expected
     return [node['clickEvent']['value'] for node in nodes if label is None or node['text'] == label]
 
 
@@ -334,7 +336,7 @@ def test_compact_rows_only_offer_permitted_shortcuts_with_semantic_colors(env, b
 
 @pytest.mark.parametrize('status, query', [('all', None), ('online', None), ('offline', None), ('online', 'missing')])
 @pytest.mark.parametrize('count', [0, 1, 12])
-def test_lists_use_explicit_colors_and_suggestions_even_for_empty_results(env, status, query, count):
+def test_lists_use_explicit_colors_and_mixed_click_actions_even_for_empty_results(env, status, query, count):
     message = view.render_bot_list(_bots(env, count), status=status, query=query, page=2, can_operate=False)
     nodes = [node for node in _text_nodes(message) if node['text'].strip()]
     assert nodes

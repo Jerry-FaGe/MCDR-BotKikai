@@ -77,12 +77,15 @@ def render_help() -> RTextList:
 
 
 def _button(label: str, command: str, description: str, *,
-            color: RColor = RColor.aqua, warning: str | None = None) -> RText:
+            color: RColor = RColor.aqua, warning: str | None = None,
+            suggest: bool = False) -> RText:
     hover = RTextList(RText(description, RColor.white))
     if warning:
         hover.append('\n', RText(warning, RColor.yellow))
-    hover.append('\n', RText('点击填入命令，检查后按回车执行', RColor.gray))
-    return RText(f'[{label}]', color).c(RAction.suggest_command, command).h(hover)
+    hint = '点击填入命令，检查后按回车执行' if suggest else '点击执行'
+    action = RAction.suggest_command if suggest else RAction.run_command
+    hover.append('\n', RText(hint, RColor.gray))
+    return RText(f'[{label}]', color).c(action, command).h(hover)
 
 
 def _custom_aliases(bot: Bot) -> list[str]:
@@ -172,8 +175,8 @@ def render_feedback(message: str, *, bot: Bot | None = None,
         )
         label = RText(name, RColor.gold)
         if name_link:
-            label.c(RAction.suggest_command, f'{config.prefix_short} {bot.name}')
-            hover.append(RText('\n点击填入详情命令，按回车查看', RColor.gray))
+            label.c(RAction.run_command, f'{config.prefix_short} {bot.name}')
+            hover.append(RText('\n点击查看详情', RColor.gray))
         result.append(label.h(hover), RText(' · ', RColor.gray))
     # Keep console-visible causes intact without injecting extra chat lines.
     compact = ' '.join(line.strip() for line in message.replace('\t', ' ').splitlines())
@@ -227,9 +230,11 @@ def render_bot_actions(bot: Bot) -> RTextList:
     actions.append(
         ' ', _button('报点/发光', f'{prefix} where', '发光两分钟，并输出登记坐标（不是实时位置）', warning=auto_spawn),
         '\n', _button('右键', f'{prefix} use', '右键一次', warning=auto_spawn),
-        ' ', _button('持续右键', f'{prefix} huse ', '持续右键；可在末尾填写正整数间隔（gt）', warning=auto_spawn),
+        ' ', _button('持续右键', f'{prefix} huse ', '持续右键；可在末尾填写正整数间隔（gt）',
+                     warning=auto_spawn, suggest=True),
         ' ', _button('左键', f'{prefix} atk', '左键一次', warning=auto_spawn),
-        ' ', _button('持续左键', f'{prefix} hatk ', '持续左键；可在末尾填写正整数间隔（gt）', warning=auto_spawn),
+        ' ', _button('持续左键', f'{prefix} hatk ', '持续左键；可在末尾填写正整数间隔（gt）',
+                     warning=auto_spawn, suggest=True),
     )
     return actions
 
@@ -251,15 +256,16 @@ def render_bot_info(bot: Bot, *, can_operate: bool = True, can_manage: bool = Fa
                   RText('[移除别名]', RColor.gray).h(RText('当前没有可移除的自定义别名', RColor.gray)))
         result.append(
             RText('\n\n管理: ', RColor.gray),
-            _button('添加别名', f'{prefix} alias add ', '在末尾填写新别名；不改变位置、朝向或动作', color=RColor.green),
+            _button('添加别名', f'{prefix} alias add ', '在末尾填写新别名；不改变位置、朝向或动作',
+                    color=RColor.green, suggest=True),
             ' ', remove,
             ' ', _button('删除记录', f'{config.prefix_short} del {bot.name}', '删除这条假人记录',
-                         color=RColor.red, warning='只删除插件记录，不会让在线假人下线'),
+                         color=RColor.red, warning='只删除插件记录，不会让在线假人下线', suggest=True),
         )
     result.append(
         '\n\n', _button('刷新', prefix, '重新显示当前详情'),
         ' ', _button('假人列表', f'{config.prefix_short} list', '查看已登记的假人'),
-        RText('\n点击按钮填入命令，按回车执行', RColor.gray),
+        RText('\n普通按钮点击执行，输入和删除操作需回车', RColor.gray),
     )
     return result
 
@@ -279,14 +285,14 @@ def render_alias_panel(bot: Bot) -> RTextList:
             result.append(
                 '\n', RText(alias, RColor.white), ' ',
                 _button('移除', f'{prefix} alias del {alias}', f'移除别名「{alias}」',
-                        color=RColor.red, warning='只移除别名，不删除记录或下线假人'),
+                        color=RColor.red, warning='只移除别名，不删除记录或下线假人', suggest=True),
             )
     else:
         result.append('\n', RText('无自定义别名', RColor.gray))
     result.append(
-        '\n\n', _button('添加别名', f'{prefix} alias add ', '在末尾填写新别名', color=RColor.green),
+        '\n\n', _button('添加别名', f'{prefix} alias add ', '在末尾填写新别名', color=RColor.green, suggest=True),
         ' ', _button('返回详情', prefix, '返回假人详情面板'),
-        RText('\n点击按钮填入命令，按回车执行', RColor.gray),
+        RText('\n添加和移除别名需回车，返回详情可直接点击', RColor.gray),
     )
     return result
 
@@ -397,7 +403,8 @@ def render_bot_list(bots: list[Bot], *, status: str = 'all', query: str | None =
         else:
             result.append(_button(label, _list_command(mode, query), f'查看{label}假人，保留搜索并回到第一页'))
         result.append(' ')
-    result.append(_button('搜索', _list_command(status) + ' search ', '填写一个关键词，搜索登记名、假人名或别名'))
+    result.append(_button('搜索', _list_command(status) + ' search ', '填写一个关键词，搜索登记名、假人名或别名',
+                          suggest=True))
     if query is not None:
         result.append(' ', _button('清除搜索', _list_command(status), '清除关键词，保留状态筛选并回到第一页'))
 
@@ -431,5 +438,5 @@ def render_bot_list(bots: list[Bot], *, status: str = 'all', query: str | None =
         result.append(' ', _button('帮助', config.prefix_short, '查看添加假人的命令和权限要求'))
     if not can_operate:
         result.append(RText('\n当前无假人操作权限', RColor.gray))
-    result.append(RText('\n悬浮名称查看信息；点击按钮填入命令，回车执行', RColor.gray))
+    result.append(RText('\n悬浮名称查看信息；普通按钮点击执行，搜索需回车', RColor.gray))
     return result

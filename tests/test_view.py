@@ -18,11 +18,15 @@ def _json_nodes(value):
             yield from _json_nodes(child)
 
 
-def _click_commands(message):
+def _click_events(message):
     nodes = _json_nodes(json.loads(message.to_json_str()))
     events = [node['clickEvent'] for node in nodes if 'clickEvent' in node]
-    assert all(event['action'] == 'suggest_command' for event in events)
-    return [event['value'] for event in events]
+    assert all(event['action'] in ('run_command', 'suggest_command') for event in events)
+    return events
+
+
+def _click_commands(message):
+    return [event['value'] for event in _click_events(message)]
 
 
 @pytest.mark.parametrize('online', [False, True])
@@ -33,16 +37,26 @@ def test_action_buttons_preserve_commands_and_online_controls(env, bot, online, 
     actions = ['kill', 'stop'] if online else ['spawn']
     actions += ['where', 'use', 'huse ', 'atk', 'hatk ']
     expected = [f'{prefix} SandBot {action}' for action in actions]
+    action_types = ['suggest_command' if action in ('huse ', 'hatk ') else 'run_command'
+                    for action in actions]
 
-    assert _click_commands(view.render_bot_actions(bot)) == expected
+    action_message = view.render_bot_actions(bot)
+    assert _click_commands(action_message) == expected
+    assert [event['action'] for event in _click_events(action_message)] == action_types
     summary_actions = ['kill', 'use'] if online else ['spawn', 'use']
-    assert _click_commands(view.render_bot_summary(bot)) == [
+    summary = view.render_bot_summary(bot)
+    assert _click_commands(summary) == [
         *(f'{prefix} SandBot {action}' for action in summary_actions), f'{prefix} SandBot',
     ]
-    assert _click_commands(view.render_bot_info(bot)) == [
+    assert all(event['action'] == 'run_command' for event in _click_events(summary))
+    info = view.render_bot_info(bot)
+    assert _click_commands(info) == [
         '[x:1, y:64, z:-3, name:SandBot, dim:minecraft:overworld]',
         *expected,
         f'{prefix} SandBot', f'{prefix} list',
+    ]
+    assert [event['action'] for event in _click_events(info)] == [
+        'suggest_command', *action_types, 'run_command', 'run_command',
     ]
 
     status = '\u5728\u7ebf' if online else '\u79bb\u7ebf'
@@ -80,6 +94,8 @@ def test_help_reads_current_prefix_and_preserves_templates(env):
 
     assert _click_commands(original) == ['!!bk' + item for item in templates]
     assert _click_commands(current) == ['!!farm' + item for item in templates]
+    assert all(event['action'] == 'suggest_command' for event in _click_events(original))
+    assert all(event['action'] == 'suggest_command' for event in _click_events(current))
     assert current.to_plain_text().startswith(view.HELP_HEAD)
     assert utils.help_head == view.HELP_HEAD
     assert utils.get_help_body() == view.get_help_body()
@@ -210,6 +226,9 @@ def test_management_controls_have_semantic_colors_and_no_formatting_codes(env, b
     assert buttons['[\u6dfb\u52a0\u522b\u540d]']['color'] == 'green'
     assert buttons['[\u79fb\u9664\u522b\u540d]']['color'] == 'aqua'
     assert buttons['[\u5220\u9664\u8bb0\u5f55]']['color'] == 'red'
+    assert buttons['[\u6dfb\u52a0\u522b\u540d]']['clickEvent']['action'] == 'suggest_command'
+    assert buttons['[\u79fb\u9664\u522b\u540d]']['clickEvent']['action'] == 'run_command'
+    assert buttons['[\u5220\u9664\u8bb0\u5f55]']['clickEvent']['action'] == 'suggest_command'
     assert all('\u00a7' not in node.get('text', '') for node in nodes)
     assert all('\u00a7' not in value for value in _click_commands(message))
 
@@ -268,6 +287,29 @@ def test_action_hover_warns_about_auto_spawn_and_record_only_deletion(env, bot, 
     assert '\u4e0d\u662f\u5b9e\u65f6\u4f4d\u7f6e' in where_hover
 
 
+@pytest.mark.parametrize('online', [False, True])
+@pytest.mark.parametrize('prefix', ['!!bk', '!!farm'])
+@pytest.mark.parametrize('renderer, options', [
+    (view.render_bot_info, {'can_manage': True}),
+    (view.render_alias_panel, {}),
+    (view.render_bot_summary, {}),
+])
+def test_button_hover_hints_match_click_actions(env, bot, online, prefix, renderer, options):
+    config.prefix_short = prefix
+    bot.is_online = online
+    nodes = _json_nodes(json.loads(renderer(bot, **options).to_json_str()))
+    for node in nodes:
+        if 'clickEvent' not in node:
+            continue
+        hover = json.dumps(node['hoverEvent'], ensure_ascii=False)
+        if node['clickEvent']['action'] == 'run_command':
+            assert '\u70b9\u51fb\u6267\u884c' in hover
+            assert '\u56de\u8f66' not in hover
+        else:
+            assert node['clickEvent']['action'] == 'suggest_command'
+            assert '\u56de\u8f66' in hover
+
+
 @pytest.mark.parametrize('can_operate', [False, True])
 @pytest.mark.parametrize('can_manage', [False, True])
 @pytest.mark.parametrize('prefix', ['!!bk', '!!farm'])
@@ -316,6 +358,9 @@ def test_alias_picker_only_removes_custom_aliases_with_exact_names(env, prefix):
         f'{prefix} SandBot alias del Farm',
         f'{prefix} SandBot alias add ',
         f'{prefix} SandBot',
+    ]
+    assert [event['action'] for event in _click_events(message)] == [
+        'suggest_command', 'suggest_command', 'suggest_command', 'run_command',
     ]
     nodes = _json_nodes(json.loads(message.to_json_str()))
     removals = [node for node in nodes if node.get('text') == '[\u79fb\u9664]']
