@@ -189,11 +189,13 @@ def test_coordinates_use_suggest_instead_of_non_slash_run_command(env, bot):
                 yield from events(child)
 
     clicks = events(json.loads(bot.get_info_rtext().to_json_str()))
-    coordinates = [event for event in clicks if event['value'].startswith('[x:')]
-    assert coordinates == [{
-        'action': 'suggest_command',
-        'value': '[x:1, y:64, z:-3, name:SandBot, dim:minecraft:overworld]',
-    }]
+    coordinates = [event for event in clicks if event['value'].startswith(('xaero-waypoint:', '[x:'))]
+    assert coordinates == [
+        {'action': 'suggest_command',
+         'value': 'xaero-waypoint:SandBot:S:1:64:-3:6:false:0:Internal-overworld-waypoints'},
+        {'action': 'suggest_command',
+         'value': '[x:1, y:64, z:-3, name:SandBot, dim:minecraft:overworld]'},
+    ]
 
 
 def test_add_queries_one_consistent_player_snapshot(env, monkeypatch):

@@ -51,12 +51,13 @@ def test_action_buttons_preserve_commands_and_online_controls(env, bot, online, 
     assert all(event['action'] == 'run_command' for event in _click_events(summary))
     info = view.render_bot_info(bot)
     assert _click_commands(info) == [
+        'xaero-waypoint:SandBot:S:1:64:-3:6:false:0:Internal-overworld-waypoints',
         '[x:1, y:64, z:-3, name:SandBot, dim:minecraft:overworld]',
         *expected,
         f'{prefix} SandBot', f'{prefix} list',
     ]
     assert [event['action'] for event in _click_events(info)] == [
-        'suggest_command', *action_types, 'run_command', 'run_command',
+        'suggest_command', 'suggest_command', *action_types, 'run_command', 'run_command',
     ]
 
     status = '\u5728\u7ebf' if online else '\u79bb\u7ebf'
@@ -247,27 +248,89 @@ def test_details_title_uses_first_custom_alias_without_reordering(env, aliases, 
     assert bot.to_dict() == before
 
 
-@pytest.mark.parametrize('dimension, label', [
-    ('minecraft:overworld', '\u4e3b\u4e16\u754c'),
-    ('minecraft:the_nether', '\u4e0b\u754c'),
-    ('minecraft:the_end', '\u672b\u5730'),
-    ('example:custom/room', 'example:custom/room'),
+@pytest.mark.parametrize('dimension, label, world', [
+    ('minecraft:overworld', '\u4e3b\u4e16\u754c', 'Internal-overworld-waypoints'),
+    ('minecraft:the_nether', '\u4e0b\u754c', 'Internal-the_nether-waypoints'),
+    ('minecraft:the_end', '\u672b\u5730', 'Internal-the_end-waypoints'),
+    ('example:custom/room', 'example:custom/room', 'Internal-dim%example$custom%room-waypoints'),
+    ('minecraft:custom/room', 'minecraft:custom/room', 'Internal-dim%minecraft$custom%room-waypoints'),
+    ('other:overworld', 'other:overworld', 'Internal-dim%other$overworld-waypoints'),
+    ('my_pack.mod-test:outer_zone/room-v1.2', 'my_pack.mod-test:outer_zone/room-v1.2',
+     'Internal-dim%my-pack.mod^min^test$outer-zone%room^min^v1.2-waypoints'),
 ])
-def test_position_display_keeps_full_precision_in_data_hover_and_coordinate_links(env, dimension, label):
+def test_position_display_keeps_full_precision_in_data_hover_and_coordinate_links(env, dimension, label, world):
     bot = Bot(env.server, 'SandBot', [], dimension, [12.3456789, 64.0001, -0.0049], [-0.00001, 91.99999])
     before = bot.to_dict()
     message = view.render_bot_info(bot)
     text = message.to_plain_text()
     serialized = message.to_json_str()
 
-    assert f'\u767b\u8bb0\u4f4d\u7f6e: {label} (12.35, 64, 0)' in text
+    assert f'\u767b\u8bb0\u4f4d\u7f6e: {label} (12.35, 64, 0) [V]' in text
     assert '\u767b\u8bb0\u671d\u5411: 0 / 92' in text
     assert '-0' not in text
     assert str(bot.position) in serialized
     assert str(bot.facing) in serialized
     assert dimension in serialized
-    assert _click_commands(message)[0] == f'[x:12, y:64, z:-1, name:SandBot, dim:{dimension}]'
+    assert _click_events(message)[:2] == [
+        {'action': 'suggest_command', 'value': f'xaero-waypoint:SandBot:S:12:64:-1:6:false:0:{world}'},
+        {'action': 'suggest_command', 'value': f'[x:12, y:64, z:-1, name:SandBot, dim:{dimension}]'},
+    ]
     assert bot.to_dict() == before
+
+
+@pytest.mark.parametrize('dimension', [
+    'example:custom/room', 'minecraft:custom/room', 'other:overworld',
+    'example:the_nether', 'my_pack.mod-test:outer_zone/room-v1.2',
+])
+def test_xaero_custom_dimension_encoding_round_trips_namespace_and_path(dimension):
+    world = view._xaero_waypoint_world(dimension)
+    assert world.startswith('Internal-dim%')
+    assert world.endswith('-waypoints')
+    assert ':' not in world and '/' not in world
+    # Decode the destination using Xaero 25.2.7's share and directory rules.
+    directory = world[len('Internal-'):world.rindex('-')]
+    directory = directory.replace('-', '_').replace('^min^', '-')
+    namespace, path = directory[len('dim%'):].split('$')
+    assert f'{namespace}:{path.replace("%", "/")}' == dimension
+
+
+@pytest.mark.parametrize('name', ['SandBot', 'Farm_Bot', '_42'])
+@pytest.mark.parametrize('block_coordinates', [False, True])
+def test_coordinate_sharing_uses_registered_name_original_floors_and_explicit_hints(env, name, block_coordinates):
+    config.bot_name_prefix = 'b_'
+    config.prefix_short = '!!farm'
+    bot = Bot(env.server, name, ['waypoint:Fake,dim:example:the_nether'],
+              'minecraft:the_nether', [1.999999, -0.0049, -2.00001], [0, 0],
+              confirmed_name=f'b_{name}')
+    before = bot.to_dict()
+    message = view._record_position(bot, coordinate_link=True, block_coordinates=block_coordinates)
+    assert _click_events(message) == [
+        {'action': 'suggest_command',
+         'value': f'xaero-waypoint:{name}:{name[0]}:1:-1:-3:6:false:0:Internal-the_nether-waypoints'},
+        {'action': 'suggest_command',
+         'value': f'[x:1, y:-1, z:-3, name:{name}, dim:minecraft:the_nether]'},
+    ]
+    nodes = [node for node in _json_nodes(json.loads(message.to_json_str())) if 'clickEvent' in node]
+    assert nodes[1]['text'] == '[V]'
+    for node, format_name in zip(nodes, ['Xaero', 'VoxelMap']):
+        hover = json.dumps(node['hoverEvent'], ensure_ascii=False)
+        assert format_name in hover
+        assert str(bot.position) in hover
+        assert '\u4e0d\u662f\u5b9e\u65f6\u4f4d\u7f6e' in hover
+        assert '\u56de\u8f66' in hover and '\u516c\u5c4f' in hover
+    assert bot.to_dict() == before
+    assert env.server.commands == []
+
+
+@pytest.mark.parametrize('renderer', [view.render_bot_summary, lambda bot: view.render_bot_list([bot])])
+def test_list_hovers_do_not_include_coordinate_sharing_controls(env, bot, renderer):
+    message = renderer(bot)
+    serialized = message.to_json_str()
+    assert '[V]' not in serialized
+    assert '[x:' not in serialized
+    assert 'xaero-waypoint:' not in serialized
+    assert all(event['action'] == 'run_command' or event['value'].endswith(' search ')
+               for event in _click_events(message))
 
 
 @pytest.mark.parametrize('online', [False, True])

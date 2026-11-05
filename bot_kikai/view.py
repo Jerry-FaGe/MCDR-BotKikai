@@ -128,7 +128,23 @@ def _number(value: float) -> str:
     return '0' if text == '-0' else text
 
 
-def _record_position(bot: Bot, *, coordinate_link: bool = False, block_coordinates: bool = False) -> RText:
+def _xaero_waypoint_world(dimension: str) -> str:
+    world = {
+        'minecraft:overworld': 'overworld',
+        'minecraft:the_nether': 'the_nether',
+        'minecraft:the_end': 'the_end',
+    }.get(dimension)
+    if world is None:
+        # Xaero 25.2.7 stores custom IDs as dim%namespace$path, replacing '/' with '%'.
+        namespace, path = dimension.split(':', 1)
+        world = f'dim%{namespace}${path.replace("/", "%")}'
+        # Share messages escape hyphens before converting underscores to hyphens.
+        world = world.replace('-', '^min^').replace('_', '-')
+    return f'Internal-{world}-waypoints'
+
+
+def _record_position(bot: Bot, *, coordinate_link: bool = False,
+                     block_coordinates: bool = False) -> RText | RTextList:
     dimension = {
         'minecraft:overworld': '主世界',
         'minecraft:the_nether': '下界',
@@ -137,15 +153,22 @@ def _record_position(bot: Bot, *, coordinate_link: bool = False, block_coordinat
     coordinates = ', '.join(str(math.floor(v)) if block_coordinates else _number(v) for v in bot.position)
     position = RText(f'{dimension} ({coordinates})',
                      RColor.aqua if coordinate_link else RColor.white)
-    if coordinate_link:
-        # Share the original block position, never the rounded display coordinates.
-        x, y, z = (math.floor(v) for v in bot.position)
-        position.c(RAction.suggest_command, f'[x:{x}, y:{y}, z:{z}, name:{bot.name}, dim:{bot.dimension}]').h(
-            RText(f'维度 ID: {bot.dimension}\n原始坐标: {bot.position}', RColor.white),
-            RText('\n这是登记的召唤位置，不是实时位置', RColor.yellow),
-            RText('\n点击填入方块坐标点，按回车发送', RColor.gray),
-        )
-    return position
+    if not coordinate_link:
+        return position
+    # Share the original block position, never the rounded display coordinates.
+    x, y, z = (math.floor(v) for v in bot.position)
+    hover = RTextList(
+        RText(f'维度 ID: {bot.dimension}\n原始坐标: {bot.position}', RColor.white),
+        RText('\n这是登记的召唤位置，不是实时位置', RColor.yellow),
+    )
+    position.c(
+        RAction.suggest_command,
+        f'xaero-waypoint:{bot.name}:{bot.name[0]}:{x}:{y}:{z}:6:false:0:{_xaero_waypoint_world(bot.dimension)}',
+    ).h(hover, RText('\n点击填入 Xaero 分享文本，按回车发送到公屏', RColor.gray))
+    voxelmap = RText('[V]', RColor.dark_aqua).c(
+        RAction.suggest_command, f'[x:{x}, y:{y}, z:{z}, name:{bot.name}, dim:{bot.dimension}]',
+    ).h(hover, RText('\n点击填入 VoxelMap 分享文本，按回车发送到公屏', RColor.gray))
+    return RTextList(position, ' ', voxelmap)
 
 
 def _record_details(bot: Bot, *, coordinate_link: bool = False) -> RTextList:

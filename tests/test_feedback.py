@@ -26,7 +26,7 @@ def _visible(message):
 def _commands(message):
     events = [node['clickEvent'] for node in _nodes(json.loads(message.to_json_str())) if 'clickEvent' in node]
     for event in events:
-        expected = 'suggest_command' if event['value'].startswith('[x:') else 'run_command'
+        expected = 'suggest_command' if event['value'].startswith(('xaero-waypoint:', '[x:')) else 'run_command'
         assert event['action'] == expected
     return [event['value'] for event in events]
 
@@ -135,21 +135,25 @@ def test_action_feedback_is_read_only_and_does_not_claim_unacknowledged_success(
     _assert_rich_feedback(message)
 
 
-@pytest.mark.parametrize('dimension, label', [
-    ('minecraft:overworld', '\u4e3b\u4e16\u754c'),
-    ('minecraft:the_nether', '\u4e0b\u754c'),
-    ('minecraft:the_end', '\u672b\u5730'),
-    ('example:custom/room', 'example:custom/room'),
+@pytest.mark.parametrize('dimension, label, world', [
+    ('minecraft:overworld', '\u4e3b\u4e16\u754c', 'Internal-overworld-waypoints'),
+    ('minecraft:the_nether', '\u4e0b\u754c', 'Internal-the_nether-waypoints'),
+    ('minecraft:the_end', '\u672b\u5730', 'Internal-the_end-waypoints'),
+    ('example:custom/room', 'example:custom/room', 'Internal-dim%example$custom%room-waypoints'),
+    ('other:overworld', 'other:overworld', 'Internal-dim%other$overworld-waypoints'),
+    ('my_pack.mod-test:outer_zone/room-v1.2', 'my_pack.mod-test:outer_zone/room-v1.2',
+     'Internal-dim%my-pack.mod^min^test$outer-zone%room^min^v1.2-waypoints'),
 ])
-def test_where_feedback_keeps_dimension_record_coordinates_and_safe_coordinate_link(env, dimension, label):
+def test_where_feedback_keeps_dimension_record_coordinates_and_safe_coordinate_link(env, dimension, label, world):
     bot = Bot(env.server, 'SandBot', ['farm'], dimension, [12.3456789, 64.0001, -0.0049], [180, 0])
     before = bot.to_dict()
     message = view.render_action_feedback(bot, 'where')
-    assert f'\u767b\u8bb0\u4f4d\u7f6e: {label} (12, 64, -1)' in message.to_plain_text()
+    assert f'\u767b\u8bb0\u4f4d\u7f6e: {label} (12, 64, -1) [V]' in message.to_plain_text()
     assert str(bot.position) in message.to_json_str()
     assert '\u4e0d\u662f\u5b9e\u65f6\u4f4d\u7f6e' in message.to_json_str()
     assert _commands(message) == [
-        '!!bk SandBot', f'[x:12, y:64, z:-1, name:SandBot, dim:{dimension}]',
+        '!!bk SandBot', f'xaero-waypoint:SandBot:S:12:64:-1:6:false:0:{world}',
+        f'[x:12, y:64, z:-1, name:SandBot, dim:{dimension}]',
     ]
     assert bot.to_dict() == before
     assert env.server.commands == []
