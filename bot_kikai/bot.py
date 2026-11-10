@@ -9,7 +9,7 @@ from .config import Config, config, is_finite_number
 
 
 class Bot:
-    def __init__(self, server: PluginServerInterface | ServerInterface, name: str, nicknames: list[str],
+    def __init__(self, server: PluginServerInterface | ServerInterface, name: str, aliases: list[str],
                  dimension: str, position: list[float], facing: list[float], settings: Config | None = None,
                  confirmed_name: str | None = None):
         settings = settings or config
@@ -25,13 +25,19 @@ class Bot:
             if not isinstance(confirmed_name, str) or re.fullmatch(r'[A-Za-z0-9_]{3,16}', confirmed_name) is None:
                 raise ValueError(f'{name}: confirmed_name 必须是 3 到 16 个英文字母、数字或下划线')
             self.confirm_name(confirmed_name)
-        if not isinstance(nicknames, list) or not all(
-            isinstance(nick, str) and nick and not any(
-                ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in nick
-            ) for nick in nicknames
+        if not isinstance(aliases, list) or not all(
+            isinstance(alias, str) and alias and not any(
+                ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in alias
+            ) for alias in aliases
         ):
-            raise ValueError(f'{name}: nicknames 必须是非空、无空白字符的字符串列表')
-        self.nicknames = list(dict.fromkeys([name, *nicknames]))
+            raise ValueError(f'{name}: aliases 必须是字符串列表，每个别名须非空且不含空白或控制字符')
+        identities = {name.casefold(), self.real_name.casefold()}
+        self.aliases = []
+        for alias in aliases:
+            key = alias.casefold()
+            if key not in identities:
+                self.aliases.append(alias)
+                identities.add(key)
         if type(dimension) is int:
             dimension = {0: 'minecraft:overworld', -1: 'minecraft:the_nether', 1: 'minecraft:the_end'}.get(dimension)
         if not isinstance(dimension, str) or re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9_./-]+', dimension) is None:
@@ -181,7 +187,7 @@ class Bot:
 
     def to_dict(self) -> dict:
         data = {
-            'nicknames': self.nicknames.copy(),
+            'aliases': self.aliases.copy(),
             'dimension': self.dimension,
             'position': self.position.copy(),
             'facing': self.facing.copy(),
@@ -195,10 +201,15 @@ class Bot:
     def from_dict(server: PluginServerInterface, name: str, data: dict, settings: Config | None = None) -> "Bot":
         if not isinstance(data, dict):
             raise ValueError(f'{name}: 假人数据必须是 JSON 对象')
-        # 兼容旧的 'nick', 'dim', 'pos' 键
-        nicknames = data.get('nicknames', data.get('nick', [name]))
-        if 'nicknames' not in data and isinstance(nicknames, str):
-            nicknames = [nicknames]
+        # 已发布配置仍可读取；显式 aliases（包括空列表）优先，保存统一使用新字段。
+        if 'aliases' in data:
+            aliases = data['aliases']
+        elif 'nicknames' in data:
+            aliases = data['nicknames']
+        else:
+            aliases = data.get('nick', [])
+            if isinstance(aliases, str):
+                aliases = [aliases]
         dimension = data.get('dimension', data.get('dim', 'minecraft:overworld'))
         position = data.get('position', data.get('pos', [0.0, 64.0, 0.0]))
         facing = data.get('facing', [0.0, 0.0])
@@ -206,7 +217,7 @@ class Bot:
         return Bot(
             server=server,
             name=name,
-            nicknames=nicknames,
+            aliases=aliases,
             dimension=dimension,
             position=position,
             facing=facing,

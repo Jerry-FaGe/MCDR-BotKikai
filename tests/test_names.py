@@ -115,7 +115,7 @@ def test_join_and_leave_persist_once_then_update_changed_spelling(env, bot, name
     assert bot.is_online
     assert read_json(config.bots_path)['SandBot']['confirmed_name'] == 'SandBot'
     assert len(writes) == 1
-    assert env.manager.get_bot_by_nickname('SANDBOT') is bot
+    assert env.manager.resolve_bot('SANDBOT') is bot
 
     bot_kikai.on_player_left(env.server, 'SandBot')
     bot_kikai.on_player_joined(env.server, 'SandBot', None)
@@ -292,7 +292,7 @@ def test_normal_edit_keeps_name_while_pending_save_is_queued(env, bot, name_save
     assert saved == current.to_dict()
     assert saved['position'] == [8, 70, 9]
     assert saved['facing'] == [45, 10]
-    assert 'new' in saved['nicknames']
+    assert 'new' in saved['aliases']
 
 
 def test_queued_confirmation_does_not_resurrect_deleted_bot(env, bot, name_saves, busy_workers):
@@ -316,7 +316,7 @@ def test_readded_record_does_not_inherit_deleted_pending_confirmation(env, bot, 
 def test_queued_confirmation_preserves_valid_external_edits(env, bot, name_saves, busy_workers):
     env.manager.update_player_status('SandBot', True)
     data = read_json(config.bots_path)
-    data['SandBot'].update(nicknames=['external'], position=[9, 80, 7], facing=[45, 15], note='keep me')
+    data['SandBot'].update(aliases=['external'], position=[9, 80, 7], facing=[45, 15], note='keep me')
     data['OtherBot'] = {'nick': 'other', 'dim': -1, 'pos': '3 70 5'}
     write_json(config.bots_path, data)
     busy_workers.set()
@@ -476,7 +476,7 @@ def test_in_progress_metadata_write_cannot_overwrite_a_newer_edit(env, bot, monk
     else:
         assert saved['SandBot']['confirmed_name'] == 'SandBot'
         assert saved['SandBot']['position'] == [9, 80, 7]
-        assert 'new' in saved['SandBot']['nicknames']
+        assert 'new' in saved['SandBot']['aliases']
 
 
 def test_full_queue_retries_name_save_after_a_slot_is_available(env, bot, name_saves):

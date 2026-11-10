@@ -121,15 +121,15 @@ def test_save_cannot_overwrite_a_newer_delete(env, bot, monkeypatch):
     assert env.manager.get_bot(bot.name) is None
 
 
-def test_concurrent_updates_merge_nicknames_without_losing_any(env, bot):
+def test_concurrent_updates_merge_aliases_without_losing_any(env, bot):
     with ThreadPoolExecutor(max_workers=8) as pool:
         futures = [pool.submit(env.manager.upsert_bot, 'SandBot', f'alias{i}',
                                'minecraft:overworld', [i, 64, 0], [0, 0]) for i in range(20)]
         for future in futures:
             future.result(timeout=5)
     expected = {f'alias{i}' for i in range(20)}
-    assert expected <= set(env.manager.get_bot('SandBot').nicknames)
-    assert expected <= set(read_json(config.bots_path)['SandBot']['nicknames'])
+    assert expected <= set(env.manager.get_bot('SandBot').aliases)
+    assert expected <= set(read_json(config.bots_path)['SandBot']['aliases'])
 
 
 @pytest.mark.parametrize('name,alias', [('sandbot', 'other'), ('OtherBot', 'farm'), ('OtherBot', 'SANDBOT'), ('list', 'other')])
@@ -147,7 +147,7 @@ def test_real_names_work_without_writing_aliases_on_join(env, bot):
     before = read_json(config.bots_path)
     bot_kikai.bot_manager_instance = env.manager
     bot_kikai.on_player_joined(env.server, 'b_SandBot', None)
-    current = env.manager.get_bot_by_nickname('B_SANDBOT')
+    current = env.manager.resolve_bot('B_SANDBOT')
     assert current.is_online
     assert current.real_name == 'b_SandBot'
     env.manager.shutdown()
@@ -219,7 +219,7 @@ def test_old_generation_cannot_commit_after_reload(env, bot):
 
 @pytest.mark.parametrize('data', [
     {'position': [1]}, {'facing': [0, float('nan')]}, {'dimension': 'invalid'},
-    {'nicknames': 'not a list'}, {'nicknames': ['two words']},
+    {'aliases': 'not a list'}, {'aliases': ['two words']},
     {'position': [True, 64, 0]}, {'dimension': '@a'}, {'position': [10 ** 1000, 64, 0]},
 ])
 def test_invalid_bot_data_is_rejected(env, data):
@@ -229,6 +229,6 @@ def test_invalid_bot_data_is_rejected(env, data):
 
 def test_legacy_data_fields_are_supported(env):
     bot = Bot.from_dict(env.server, 'TestBot', {'nick': 'farm', 'dim': -1, 'pos': '1 64 2', 'facing': '90 0'})
-    assert bot.nicknames == ['TestBot', 'farm']
+    assert bot.aliases == ['farm']
     assert bot.dimension == 'minecraft:the_nether'
     assert bot.position == [1, 64, 2]

@@ -51,8 +51,8 @@ def get_help_body() -> dict[str, str]:
         f"§7{config.prefix_short} list §6[online§7|§6offline] [page]": "§r分页查看假人，每页 10 条，可筛选在线或离线",
         f"§7{config.prefix_short} list §6[online§7|§6offline] §7search §6<关键词> [page]": "§r搜索登记名、假人名和别名，不区分大小写",
         f"§7{config.prefix_short} reload": "§r重载插件配置",
-        f"§7{config.prefix_short} add §6<name> <kikai>": "§r使用当前玩家参数添加一个名为 §6<name> §r用于 §6<kikai> §r的假人",
-        f"§7{config.prefix_short} add §6<name> <kikai> <dim> <pos> <facing>": "§r使用自定义参数添加一个名为 §6<name> §r用于 §6<kikai> §r的假人",
+        f"§7{config.prefix_short} add §6<name> <alias>": "§r使用玩家当前位置与朝向登记假人，并添加别名 §6<alias>",
+        f"§7{config.prefix_short} add §6<name> <alias> <dim> <pos> <facing>": "§r使用指定位置与朝向登记假人，并添加别名 §6<alias>",
         f"§7{config.prefix_short} del §6<kikai>": "§r删除用于 §6<kikai> §r的假人记录（不会下线）",
         f"§7{config.prefix_short} §6<kikai> §7alias": "§r打开别名管理面板",
         f"§7{config.prefix_short} §6<kikai> §7alias add §6<alias>": "§r添加别名，不改变登记位置和朝向",
@@ -88,18 +88,13 @@ def _button(label: str, command: str, description: str, *,
     return RText(f'[{label}]', color).c(action, command).h(hover)
 
 
-def _custom_aliases(bot: Bot) -> list[str]:
-    identities = {bot.name.casefold(), bot.real_name.casefold()}
-    return [nick for nick in bot.nicknames if nick.casefold() not in identities]
-
-
 def _display_name(bot: Bot) -> str:
-    aliases = _custom_aliases(bot)
+    aliases = bot.aliases
     return aliases[0] if aliases else bot.name
 
 
-def _display_nicknames(bot: Bot) -> RText:
-    aliases = _custom_aliases(bot)
+def _display_aliases(bot: Bot) -> RText:
+    aliases = bot.aliases
     return RText('、'.join(aliases) if aliases else '无自定义别名',
                  RColor.white if aliases else RColor.gray)
 
@@ -176,7 +171,7 @@ def _record_details(bot: Bot, *, coordinate_link: bool = False) -> RTextList:
         RText(f'水平角 (yaw) / 俯仰角 (pitch)\n原始朝向: {bot.facing}', RColor.white))
     return RTextList(
         _display_player_name(bot),
-        RText('\n别名: ', RColor.gray), _display_nicknames(bot),
+        RText('\n别名: ', RColor.gray), _display_aliases(bot),
         RText('\n登记位置: ', RColor.gray), _record_position(bot, coordinate_link=coordinate_link),
         RText('\n登记朝向: ', RColor.gray), facing,
     )
@@ -194,7 +189,7 @@ def render_feedback(message: str, *, bot: Bot | None = None,
             RText('显示名: ', RColor.gray), RText(name, RColor.gold),
             RText('\n登记名: ', RColor.gray), RText(bot.name, RColor.white),
             '\n', _display_player_name(bot),
-            RText('\n别名: ', RColor.gray), _display_nicknames(bot),
+            RText('\n别名: ', RColor.gray), _display_aliases(bot),
         )
         label = RText(name, RColor.gold)
         if name_link:
@@ -274,7 +269,7 @@ def render_bot_info(bot: Bot, *, can_operate: bool = True, can_manage: bool = Fa
     else:
         result.append(RText('当前无假人操作权限', RColor.gray))
     if can_manage:
-        aliases = _custom_aliases(bot)
+        aliases = bot.aliases
         remove = (_button('移除别名', f'{prefix} alias', '打开别名列表，选择要移除的别名') if aliases else
                   RText('[移除别名]', RColor.gray).h(RText('当前没有可移除的自定义别名', RColor.gray)))
         result.append(
@@ -295,7 +290,7 @@ def render_bot_info(bot: Bot, *, can_operate: bool = True, can_manage: bool = Fa
 
 def render_alias_panel(bot: Bot) -> RTextList:
     prefix = f'{config.prefix_short} {bot.name}'
-    aliases = _custom_aliases(bot)
+    aliases = bot.aliases
     result = RTextList(
         RText('----- ', RColor.gray), RText(_display_name(bot), RColor.gold),
         RText(' · 别名管理 -----\n', RColor.gray),
@@ -403,7 +398,7 @@ def render_bot_list(bots: list[Bot], *, status: str = 'all', query: str | None =
     if query is not None:
         needle = query.casefold()
         rows = [(bot, online) for bot, online in rows if any(
-            needle in name.casefold() for name in (bot.name, bot.real_name, *bot.nicknames))]
+            needle in name.casefold() for name in (bot.name, bot.real_name, *bot.aliases))]
     rows.sort(key=lambda row: (row[0].name.casefold(), row[0].name))
     total = len(rows)
     pages = max(1, (total + LIST_PAGE_SIZE - 1) // LIST_PAGE_SIZE)

@@ -72,7 +72,7 @@ def test_atomic_write_preserves_original_if_replace_fails(tmp_path, monkeypatch)
 
 def test_json_round_trip_does_not_rewrite_string_whitespace(tmp_path):
     path = tmp_path / 'data.json'
-    data = {'nicknames': ['a  b', 'hello [  world  ]'], 'position': [1, 2, 3]}
+    data = {'aliases': ['a  b', 'hello [  world  ]'], 'position': [1, 2, 3]}
     storage.write_json(path, data)
     assert storage.read_json(path) == data
 
@@ -85,7 +85,8 @@ def test_first_install_creates_default_files_without_backups(env, caplog):
 
 
 @pytest.mark.parametrize('record', [
-    {'nicknames': ['farm'], 'position': [1, 64, 2]},
+    {'aliases': ['farm'], 'position': [1, 64, 2]},
+    {'nicknames': ['SandBot', 'farm'], 'position': [1, 64, 2]},
     {'nick': 'farm', 'dim': -1, 'pos': '1 64 2', 'facing': '90 0'},
 ])
 @pytest.mark.parametrize('bots_state', ['missing', 'same', 'different', 'invalid'])
@@ -98,7 +99,7 @@ def test_old_config_layout_is_rejected_without_touching_files(env, record, bots_
     elif bots_state == 'same':
         storage.write_json(config.bots_path, old)
     elif bots_state == 'different':
-        storage.write_json(config.bots_path, {'OtherBot': {'nicknames': ['other']}})
+        storage.write_json(config.bots_path, {'OtherBot': {'aliases': ['other']}})
     else:
         Path(config.bots_path).write_text('{', encoding='utf8')
     if has_backups:
@@ -147,7 +148,7 @@ def test_split_config_keeps_legacy_bot_fields_and_existing_backups(env):
 
     bot = env.manager.get_bot('SandBot')
     assert config.spawn_max_wait_time == 5.0
-    assert bot.nicknames == ['SandBot', 'farm']
+    assert bot.aliases == ['farm']
     assert bot.dimension == 'minecraft:the_nether'
     assert bot.position == [1, 64, 2]
     assert bot.facing == [90, 0]

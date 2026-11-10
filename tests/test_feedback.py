@@ -65,7 +65,7 @@ def test_feedback_uses_full_first_custom_alias_and_registered_name_link(env, pre
     assert ('b_SandBot' if confirmed else 'b_sandbot') in hover
     assert ('\u5f85\u786e\u8ba4' in hover) is not confirmed
     assert '\u767b\u8bb0\u540d:' in hover and '\u5047\u4eba\u540d:' in hover
-    assert all(alias in hover for alias in view._custom_aliases(bot))
+    assert all(alias in hover for alias in bot.aliases)
     assert '\u70b9\u51fb\u67e5\u770b\u8be6\u60c5' in hover
     assert '\u56de\u8f66' not in hover
     assert _commands(message) == [f'{prefix} SandBot']
@@ -167,7 +167,7 @@ def test_action_commands_reply_once_with_primary_alias_and_preserve_execution(
     bot.is_online = True
     messages = []
     monkeypatch.setattr(env.source, 'reply', messages.append)
-    context = {'nickname': target, 'use_interval': interval, 'atk_interval': interval}
+    context = {'target': target, 'use_interval': interval, 'atk_interval': interval}
     task = command.bot_action(env.source, context, action, env.manager)
     task.result(timeout=2)
 
@@ -189,7 +189,7 @@ def test_action_failures_keep_known_causes_but_do_not_guess_unknown_ones(env, bo
     messages = []
     monkeypatch.setattr(bot, 'use', fail)
     monkeypatch.setattr(env.source, 'reply', messages.append)
-    command.bot_action(env.source, {'nickname': 'farm'}, 'use', env.manager).result(timeout=2)
+    command.bot_action(env.source, {'target': 'farm'}, 'use', env.manager).result(timeout=2)
     assert len(messages) == 1
     message = messages[0]
     body = _visible(message)[-1]
@@ -219,7 +219,7 @@ def test_alias_feedback_uses_post_edit_name_and_survives_removing_the_invoking_a
     env.server.running = False
     messages = []
     monkeypatch.setattr(env.source, 'reply', messages.append)
-    command.edit_alias(env.source, {'nickname': target, 'alias': alias}, env.manager, remove=remove)
+    command.edit_alias(env.source, {'target': target, 'alias': alias}, env.manager, remove=remove)
     assert len(messages) == 1
     message = messages[0]
     verb = '\u79fb\u9664' if remove else '\u6dfb\u52a0'
@@ -236,7 +236,7 @@ def test_no_op_alias_feedback_is_neutral_and_does_not_write(env, bot, monkeypatc
     before = Path(config.bots_path).read_bytes()
     messages = []
     monkeypatch.setattr(env.source, 'reply', messages.append)
-    command.edit_alias(env.source, {'nickname': 'farm', 'alias': alias}, env.manager, remove=remove)
+    command.edit_alias(env.source, {'target': 'farm', 'alias': alias}, env.manager, remove=remove)
     assert len(messages) == 1
     assert _visible(messages[0])[-1]['color'] == 'gray'
     assert Path(config.bots_path).read_bytes() == before
@@ -258,9 +258,9 @@ def test_alias_feedback_cannot_be_attributed_to_a_rebound_invoking_alias(env, bo
     messages = []
     monkeypatch.setattr(env.manager, 'add_alias', rebind_then_edit)
     monkeypatch.setattr(env.source, 'reply', messages.append)
-    command.edit_alias(env.source, {'nickname': 'farm', 'alias': 'new'}, env.manager)
-    assert env.manager.get_bot_by_nickname('new') is bot
-    assert env.manager.get_bot_by_nickname('farm') is other
+    command.edit_alias(env.source, {'target': 'farm', 'alias': 'new'}, env.manager)
+    assert env.manager.resolve_bot('new') is bot
+    assert env.manager.resolve_bot('farm') is other
     assert messages[0].to_plain_text().startswith('[BK] \u5237\u6c99\u673a \u00b7 ')
     assert _commands(messages[0]) == ['!!bk SandBot']
     assert env.server.commands == []
@@ -270,7 +270,7 @@ def test_deleted_record_feedback_keeps_identity_but_has_no_dead_details_link(env
     bot.is_online = True
     messages = []
     monkeypatch.setattr(env.source, 'reply', messages.append)
-    command.del_bot(env.source, {'nickname': '\u5237\u6c99\u673a'}, env.manager)
+    command.del_bot(env.source, {'target': '\u5237\u6c99\u673a'}, env.manager)
     assert len(messages) == 1
     message = messages[0]
     assert message.to_plain_text() == '[BK] farm \u00b7 \u5df2\u5220\u9664\u8bb0\u5f55'
@@ -285,11 +285,11 @@ def test_deleted_record_feedback_keeps_identity_but_has_no_dead_details_link(env
 def test_add_update_and_reload_feedback_use_the_same_compact_style(env, monkeypatch):
     messages = []
     monkeypatch.setattr(env.source, 'reply', messages.append)
-    context = {'name': 'SandBot', 'nickname': 'first', 'dim': 'overworld',
+    context = {'name': 'SandBot', 'alias': 'first', 'dim': 'overworld',
                'pos_x': 1, 'pos_y': 64, 'pos_z': 2, 'facing_y': 180, 'facing_p': 0}
     command.add_bot_full(env.source, context, env.manager)
     assert messages[-1].to_plain_text() == '[BK] first \u00b7 \u5df2\u6dfb\u52a0\u8bb0\u5f55'
-    context['nickname'] = 'second'
+    context['alias'] = 'second'
     command.add_bot_full(env.source, context, env.manager)
     assert messages[-1].to_plain_text() == '[BK] first \u00b7 \u5df2\u66f4\u65b0\u8bb0\u5f55'
     assert _commands(messages[-1]) == ['!!bk SandBot']
@@ -308,19 +308,19 @@ def test_command_precondition_errors_use_rich_feedback_without_actions(env, bot,
     monkeypatch.setattr(env.source, 'reply', messages.append)
     if case == 'permission':
         env.source.permission = 0
-        command.bot_action(env.source, {'nickname': 'farm'}, 'use', env.manager)
+        command.bot_action(env.source, {'target': 'farm'}, 'use', env.manager)
     elif case == 'missing':
-        command.bot_action(env.source, {'nickname': 'missing'}, 'info', env.manager)
+        command.bot_action(env.source, {'target': 'missing'}, 'info', env.manager)
     elif case == 'list':
         command.list_bots(env.source, env.manager, page=0)
     elif case == 'player_only':
-        command.add_bot_simple(env.source, {'name': 'NewBot', 'nickname': 'new'}, env.manager)
+        command.add_bot_simple(env.source, {'name': 'NewBot', 'alias': 'new'}, env.manager)
     else:
         def full(*args):
             raise RuntimeError('queue is full')
 
         monkeypatch.setattr(env.manager, 'submit', full)
-        command.bot_action(env.source, {'nickname': 'farm'}, 'use', env.manager)
+        command.bot_action(env.source, {'target': 'farm'}, 'use', env.manager)
     assert len(messages) == 1
     assert _visible(messages[0])[-1]['color'] == 'red'
     assert _commands(messages[0]) == []

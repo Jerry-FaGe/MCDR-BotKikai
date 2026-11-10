@@ -118,7 +118,7 @@ def test_bots_work_again_after_server_restart(env, bot):
 
 def test_failed_action_does_not_reply_success(env, bot):
     config.spawn_max_wait_time = 0.01
-    task = command.bot_action(env.source, {'nickname': 'farm'}, 'use', env.manager)
+    task = command.bot_action(env.source, {'target': 'farm'}, 'use', env.manager)
     task.result(timeout=2)
     assert '\u64cd\u4f5c\u672a\u5b8c\u6210' in env.source.messages[-1]
     assert '\u5df2\u53d1\u9001' not in env.source.messages[-1]
@@ -127,7 +127,7 @@ def test_failed_action_does_not_reply_success(env, bot):
 
 def test_action_without_ack_only_reports_request_sent(env, bot):
     bot.is_online = True
-    task = command.bot_action(env.source, {'nickname': 'farm'}, 'kill', env.manager)
+    task = command.bot_action(env.source, {'target': 'farm'}, 'kill', env.manager)
     task.result(timeout=2)
     assert '\u5df2\u53d1\u9001' in env.source.messages[-1]
     assert bot.is_online
@@ -135,14 +135,14 @@ def test_action_without_ack_only_reports_request_sent(env, bot):
 
 def test_kill_is_not_blocked_by_an_incomplete_online_cache(env, bot):
     assert not bot.is_online
-    task = command.bot_action(env.source, {'nickname': 'farm'}, 'kill', env.manager)
+    task = command.bot_action(env.source, {'target': 'farm'}, 'kill', env.manager)
     task.result(timeout=2)
     assert env.server.commands == ['player sandbot kill']
 
 
 def test_guest_cannot_schedule_bot_actions(env, bot):
     env.source.permission = 0
-    assert command.bot_action(env.source, {'nickname': 'farm'}, 'use', env.manager) is None
+    assert command.bot_action(env.source, {'target': 'farm'}, 'use', env.manager) is None
     assert not env.server.commands
     assert '\u6743\u9650' in env.source.messages[-1]
 
@@ -206,7 +206,7 @@ def test_add_queries_one_consistent_player_snapshot(env, monkeypatch):
         return {'Pos': [1, 64, 2], 'Dimension': 'minecraft:overworld', 'Rotation': [90, 0]}
 
     monkeypatch.setitem(sys.modules, 'minecraft_data_api', SimpleNamespace(get_player_info=query))
-    task = command.add_bot_simple(env.player, {'name': 'NewBot', 'nickname': 'new'}, env.manager)
+    task = command.add_bot_simple(env.player, {'name': 'NewBot', 'alias': 'new'}, env.manager)
     task.result(timeout=2)
     assert queries == [('Tester',)]
     assert env.manager.get_bot('NewBot').position == [1, 64, 2]
@@ -222,7 +222,7 @@ def test_unload_during_player_query_cannot_write_data(env, monkeypatch):
         return {'Pos': [1, 64, 2], 'Dimension': 'minecraft:overworld', 'Rotation': [0, 0]}
 
     monkeypatch.setitem(sys.modules, 'minecraft_data_api', SimpleNamespace(get_player_info=query))
-    task = command.add_bot_simple(env.player, {'name': 'NewBot', 'nickname': 'new'}, env.manager)
+    task = command.add_bot_simple(env.player, {'name': 'NewBot', 'alias': 'new'}, env.manager)
     try:
         assert entered.wait(2)
         env.manager.shutdown()
@@ -235,7 +235,7 @@ def test_unload_during_player_query_cannot_write_data(env, monkeypatch):
 @pytest.mark.parametrize('data', [None, [], {'Pos': [1, 2, 3]}])
 def test_unavailable_or_incomplete_player_data_is_not_saved(env, monkeypatch, data):
     monkeypatch.setitem(sys.modules, 'minecraft_data_api', SimpleNamespace(get_player_info=lambda *args: data))
-    task = command.add_bot_simple(env.player, {'name': 'NewBot', 'nickname': 'new'}, env.manager)
+    task = command.add_bot_simple(env.player, {'name': 'NewBot', 'alias': 'new'}, env.manager)
     task.result(timeout=2)
     assert not env.manager.bots
     assert '\u65e0\u6cd5' in env.player.messages[-1]
@@ -264,10 +264,10 @@ def test_alias_commands_work_without_minecraft_queries_or_bot_actions(env, bot, 
     monkeypatch.setattr(utils, 'get_pos', fail)
     monkeypatch.setattr(env.manager, 'request_sync', fail)
     run_command(root, source, f'{prefix} farm alias add \u6c99\u573a')
-    assert env.manager.get_bot_by_nickname('\u6c99\u573a') is bot
+    assert env.manager.resolve_bot('\u6c99\u573a') is bot
     assert '\u5df2\u6dfb\u52a0\u522b\u540d' in source.messages[-1]
     run_command(root, source, f'{prefix} \u6c99\u573a alias del FARM')
-    assert env.manager.get_bot_by_nickname('farm') is None
+    assert env.manager.resolve_bot('farm') is None
     assert bot.position == [1.5, 64, -2.5]
     assert not env.server.commands
 
@@ -281,7 +281,7 @@ def test_alias_commands_require_management_permission(env, bot, permission, remo
     before = Path(config.bots_path).read_bytes()
     with pytest.raises(CommandError):
         run_command(env.server.roots[0], env.source, f'!!bk farm alias {operation} new')
-    command.edit_alias(env.source, {'nickname': 'farm', 'alias': 'new'}, env.manager, remove=remove)
+    command.edit_alias(env.source, {'target': 'farm', 'alias': 'new'}, env.manager, remove=remove)
     assert '\u6743\u9650' in env.source.messages[-1]
     assert Path(config.bots_path).read_bytes() == before
 
@@ -291,11 +291,11 @@ def test_alias_command_permissions_follow_current_config(env, bot):
     command.register_command_tree(env.server, env.manager)
     config.permission['list'] = 2
     run_command(env.server.roots[0], env.source, '!!bk farm alias add new')
-    assert env.manager.get_bot_by_nickname('new') is bot
+    assert env.manager.resolve_bot('new') is bot
     config.permission['list'] = 3
     with pytest.raises(CommandError):
         run_command(env.server.roots[0], env.source, '!!bk farm alias del new')
-    assert env.manager.get_bot_by_nickname('new') is bot
+    assert env.manager.resolve_bot('new') is bot
 
 
 @pytest.mark.parametrize('arguments', ['alias add', 'alias del', 'alias add new extra'])
@@ -331,9 +331,9 @@ def test_alias_commands_do_not_reserve_a_new_top_level_name(env):
     run_command(root, env.source, '!!bk alias')
     assert 'alias' in env.source.messages[-1]
     run_command(root, env.source, '!!bk alias alias add new')
-    assert env.manager.get_bot_by_nickname('new') is env.manager.get_bot('alias')
+    assert env.manager.resolve_bot('new') is env.manager.get_bot('alias')
     run_command(root, env.source, '!!bk alias alias del new')
-    assert env.manager.get_bot_by_nickname('new') is None
+    assert env.manager.resolve_bot('new') is None
 
 
 def test_failed_alias_save_does_not_reply_success(env, bot, monkeypatch):
@@ -348,7 +348,7 @@ def test_failed_alias_save_does_not_reply_success(env, bot, monkeypatch):
     assert 'disk full' in env.source.messages[-1]
     assert '\u522b\u540d\u4fee\u6539\u5931\u8d25' in env.source.messages[-1]
     assert '\u5df2\u6dfb\u52a0\u522b\u540d' not in env.source.messages[-1]
-    assert env.manager.get_bot_by_nickname('new') is None
+    assert env.manager.resolve_bot('new') is None
 
 
 @pytest.mark.parametrize('source_name', ['source', 'player'])
@@ -386,7 +386,7 @@ def test_alias_panel_requires_permission_in_tree_and_callback(env, bot, permissi
     before = Path(config.bots_path).read_bytes()
     with pytest.raises(CommandError):
         run_command(env.server.roots[0], env.source, '!!bk farm alias')
-    command.bot_action(env.source, {'nickname': 'farm'}, 'alias', env.manager)
+    command.bot_action(env.source, {'target': 'farm'}, 'alias', env.manager)
     assert '\u6743\u9650\u4e0d\u8db3' in env.source.messages[-1]
     assert Path(config.bots_path).read_bytes() == before
 
@@ -431,7 +431,7 @@ def test_panel_commands_round_trip_and_old_panels_cannot_bypass_permissions(env,
     alias_clicks = list(clicks(json.loads(messages[-1].to_json_str())))
     remove_farm = next(value for label, value in alias_clicks if value.endswith(' alias del farm'))
     run_command(root, env.source, remove_farm)
-    assert env.manager.get_bot_by_nickname('farm') is None
+    assert env.manager.resolve_bot('farm') is None
 
     back = next(value for label, value in alias_clicks if label == '[\u8fd4\u56de\u8be6\u60c5]')
     run_command(root, env.source, back)

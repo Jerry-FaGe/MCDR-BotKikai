@@ -27,6 +27,8 @@
 - **前后缀与大小写自适应**：支持 Carpet 假人前后缀，自动记录并持久化服务端真实游戏名大小写
 - **安全与稳定性**：配置热重载、原子文件保存、多级权限控制及动作生命周期安全取消
 
+BotKikai 与兄弟项目 [BotMono](https://github.com/Jerry-FaGe/MCDR-BotMono) 以 **1.0.0** 作为共同的稳定版起点。后续共同功能同步发版，独立修复各自递增补丁号；具体约定见 [版本与发布流程](.github/WORKFLOWS.md#版本约定)。
+
 ## ⚙️ 依赖
 
 - Python >= 3.10
@@ -35,6 +37,8 @@
 - Minecraft 服务端需要安装 [Carpet](https://github.com/gnembon/fabric-carpet) 模组
 
 > 注：旧环境升级时请先更新上述依赖；插件不要求开启 RCON。
+
+将 `BotKikai-v1.0.0.mcdr` 放入 MCDR 的 `plugins` 目录并加载。
 
 ## 📖 命令说明
 
@@ -52,8 +56,8 @@
 | `!!bk list [online\|offline] [page]` | 分页查看假人列表，可筛选在线或离线状态（每页 10 条） | 所有人 (guest) |
 | `!!bk list [online\|offline] search <关键词> [page]` | 搜索假人（匹配登记名、游戏名或别名） | 所有人 (guest) |
 | `!!bk <kikai>` | 显示假人详情面板与操作入口 | 所有人 (guest) |
-| `!!bk add <name> <kikai>` | 使用当前玩家所在位置和朝向添加/更新假人 | 管理员 (admin) |
-| `!!bk add <name> <kikai> <dim> <pos> <facing>` | 使用指定参数手动添加/更新假人 | 管理员 (admin) |
+| `!!bk add <name> <alias>` | 使用当前玩家所在位置和朝向添加/更新假人 | 管理员 (admin) |
+| `!!bk add <name> <alias> <dim> <pos> <facing>` | 使用指定参数手动添加/更新假人 | 管理员 (admin) |
 | `!!bk del <kikai>` | 删除假人记录（不会下线游戏中已在线假人） | 管理员 (admin) |
 | `!!bk <kikai> alias` | 打开别名管理面板 | 管理员 (admin) |
 | `!!bk <kikai> alias add <alias>` | 为指定假人添加别名 | 管理员 (admin) |
@@ -73,7 +77,7 @@
 | `!!bk <kikai> hatk [<interval>]` | 假人持续左键，可选间隔时间（单位：gt） | 玩家 (user) |
 | `!!bk <kikai> stop` | 停止假人的所有动作 | 玩家 (user) |
 
-> 说明：命令中的 `<kikai>` 可使用假人的**登记名**、**游戏名**或任意**别名**（均不区分大小写）。
+> 说明：命令中的 `<kikai>` 可使用假人的**登记名**、**游戏名**或任意**别名**（均不区分大小写）；`<alias>` 表示要添加或移除的单个别名。
 
 ## ⚡ 快速上手
 
@@ -162,7 +166,7 @@
 ```json
 {
     "SandBot": {
-        "nicknames": ["SandBot", "刷沙机", "shuashaji"],
+        "aliases": ["刷沙机", "shuashaji"],
         "dimension": "minecraft:overworld",
         "position": [-2.44, 70.0, -5.05],
         "facing": [180.0, 30.0]
@@ -170,11 +174,13 @@
 }
 ```
 
-- `nicknames`: 假人的所有别名列表（第一项为基础登记名）
+- `aliases`: 只保存附加别名，不重复存储登记名或游戏名；按不区分大小写去重，保留首次出现的写法和顺序。可省略或写成 `[]`；登记名和游戏名始终可查找。列表与详情优先显示第一个别名，没有别名时显示登记名。
 - `dimension`: 假人所在维度
 - `position`: 假人位置坐标 `[x, y, z]`
 - `facing`: 假人视线朝向 `[水平角, 垂直角]`
 - `confirmed_name`: *（可选）* 插件自动确认并持久化的服务端真实大小写游戏名，通常由插件自动维护，无需手动干预。
+
+已有 `bots.json` 中的 `nicknames` 列表和更早的 `nick` 字段仍可读取。若同时存在新旧字段，以 `aliases` 为准，包括显式的空列表。读取不会改写文件；新增或完整保存记录时使用 `aliases`，独立增删别名只转换对应记录的别名字段，保留其他字段和其他记录。
 
 ### 配置重载与数据安全
 
@@ -255,10 +261,10 @@
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
-python -m mcdreforged pack
+python -m mcdreforged pack --input . --output dist
 ```
 
-测试套件完整覆盖了配置校验、原子读写、别名管理、并发任务、命令解析及富文本面板渲染。CI 矩阵覆盖 Python 3.10 / 3.12 及 MCDR 2.12.0 / 2.16.2。
+测试套件完整覆盖了配置校验、原子读写、别名管理、并发任务、命令解析及富文本面板渲染。CI 矩阵使用 Python 3.10 / MCDR 2.12.0 与 Python 3.14 / MCDR 2.16.2，并验证安装包与源码一致。
 
 ## ⚠️ 声明
 

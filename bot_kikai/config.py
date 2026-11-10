@@ -64,7 +64,7 @@ class Config:
             raise ValueError('config.json 必须是 JSON 对象')
         unknown = set(data) - set(cls.FIELDS)
         if unknown:
-            if any(isinstance(data[key], dict) and ('nicknames' in data[key] or 'nick' in data[key])
+            if any(isinstance(data[key], dict) and {'aliases', 'nicknames', 'nick'} & data[key].keys()
                    for key in unknown):
                 raise ValueError('config.json 不再支持旧版假人记录布局；请先备份，使用已发布的 v0.6.0 迁移到 bots.json 后再升级')
             raise ValueError(f'未知配置项: {", ".join(sorted(unknown))}')

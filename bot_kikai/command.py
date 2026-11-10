@@ -32,9 +32,9 @@ def reload_plugin(source: CommandSource, bot_manager: BotManager):
 
 def _save_bot(source: CommandSource, context: dict, bot_manager: BotManager,
               pos, dim, facing, generation: int | None = None):
-    name, nickname = context['name'], context['nickname']
+    name, alias = context['name'], context['alias']
     try:
-        added = bot_manager.upsert_bot(name, nickname, dim, pos, facing, generation)
+        added = bot_manager.upsert_bot(name, alias, dim, pos, facing, generation)
     except (OSError, ValueError, RuntimeError) as error:
         source.reply(view.render_feedback(f'保存失败: {error}', bot=bot_manager.get_bot(name), kind='error'))
         return
@@ -75,10 +75,10 @@ def add_bot_full(source: CommandSource, context: dict, bot_manager: BotManager):
     _save_bot(source, context, bot_manager, pos, dim, facing)
 
 def del_bot(source: CommandSource, context: dict, bot_manager: BotManager):
-    nickname = context["nickname"]
+    target = context["target"]
     bot = None
     try:
-        bot = bot_manager.get_bot_by_nickname(nickname)
+        bot = bot_manager.resolve_bot(target)
         removed = bot is not None and bot_manager.remove_bot(bot.name)
     except (OSError, ValueError, RuntimeError) as error:
         source.reply(view.render_feedback(f'删除失败: {error}', bot=bot, kind='error'))
@@ -87,17 +87,17 @@ def del_bot(source: CommandSource, context: dict, bot_manager: BotManager):
         source.reply(view.render_feedback('已删除记录', bot=bot, kind='success', name_link=False,
                                           details='只删除插件记录，不会让假人下线'))
     else:
-        source.reply(view.render_feedback(f'未找到假人「{nickname}」', kind='error'))
+        source.reply(view.render_feedback(f'未找到假人「{target}」', kind='error'))
 
 def edit_alias(source: CommandSource, context: dict, bot_manager: BotManager, *, remove: bool = False):
     if not source.has_permission(config.permission['list']):
         source.reply(view.render_feedback('权限不足', kind='error'))
         return
-    target, alias = context['nickname'], context['alias']
+    target, alias = context['target'], context['alias']
     method = bot_manager.remove_alias if remove else bot_manager.add_alias
     bot = None
     try:
-        bot = bot_manager.get_bot_by_nickname(target)
+        bot = bot_manager.resolve_bot(target)
         # Pin the resolved record even if its invoking alias is changed concurrently.
         changed = method(bot.name if bot is not None else target, alias)
     except (OSError, ValueError, RuntimeError) as error:
@@ -116,13 +116,13 @@ def _bot_action(source: CommandSource, context: dict, action: str, bot_manager: 
     if action == 'alias' and not source.has_permission(config.permission['list']):
         source.reply(view.render_feedback('权限不足', kind='error'))
         return
-    nickname = context['nickname']
+    target = context['target']
     try:
-        bot = bot_manager.get_bot_by_nickname(nickname, generation=generation)
+        bot = bot_manager.resolve_bot(target, generation=generation)
     except RuntimeError:
         return
     if not bot:
-        source.reply(view.render_feedback(f'未找到假人「{nickname}」', kind='error'))
+        source.reply(view.render_feedback(f'未找到假人「{target}」', kind='error'))
         return
 
     if action == 'info':
@@ -185,7 +185,7 @@ def bot_action(source: CommandSource, context: dict, action: str, bot_manager: B
 
 
 def register_command_tree(server: PluginServerInterface, bot_manager: BotManager):
-    action_node = Text('nickname').runs(
+    action_node = Text('target').runs(
         lambda src, ctx: bot_action(src, ctx, 'info', bot_manager)
     ).then(
         Literal('spawn').runs(lambda src, ctx: bot_action(src, ctx, 'spawn', bot_manager))
@@ -225,7 +225,7 @@ def register_command_tree(server: PluginServerInterface, bot_manager: BotManager
 
     add_node = Literal('add').requires(lambda src: src.has_permission(config.permission['list'])).then(
         Text('name').then(
-            Text('nickname').runs(lambda src, ctx: add_bot_simple(src, ctx, bot_manager)).then(
+            Text('alias').runs(lambda src, ctx: add_bot_simple(src, ctx, bot_manager)).then(
                 Text('dim').then(
                     Float('pos_x').then(
                         Float('pos_y').then(
@@ -242,7 +242,7 @@ def register_command_tree(server: PluginServerInterface, bot_manager: BotManager
     )
 
     del_node = Literal('del').requires(lambda src: src.has_permission(config.permission['list'])).then(
-        Text('nickname').runs(lambda src, ctx: del_bot(src, ctx, bot_manager))
+        Text('target').runs(lambda src, ctx: del_bot(src, ctx, bot_manager))
     )
 
     def list_branch(literal: str, status: str) -> Literal:

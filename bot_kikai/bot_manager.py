@@ -57,7 +57,7 @@ class BotManager:
         aliases: dict[str, Bot] = {}
         real_names: dict[str, Bot] = {}
         for bot in bots.values():
-            for name in [bot.name, bot.real_name, *bot.nicknames]:
+            for name in [bot.name, bot.real_name, *bot.aliases]:
                 key = name.casefold()
                 if key in {'add', 'del', 'list', 'reload'}:
                     raise ValueError(f'{bot.name}: 名称或别名 {name!r} 与管理命令冲突')
@@ -157,15 +157,15 @@ class BotManager:
         with self._lock:
             self._commit({**self.bots, bot.name: bot})
 
-    def upsert_bot(self, name: str, nickname: str, dimension: str, position, facing,
+    def upsert_bot(self, name: str, alias: str, dimension: str, position, facing,
                    generation: int | None = None) -> bool:
         with self._lock:
             self._check_active(generation)
             old_bot = self.bots.get(name)
-            nicknames = old_bot.nicknames.copy() if old_bot else [name]
-            if nickname not in nicknames:
-                nicknames.append(nickname)
-            bot = Bot(self.server, name, nicknames, dimension, position, facing)
+            aliases = old_bot.aliases.copy() if old_bot else []
+            if alias not in aliases:
+                aliases.append(alias)
+            bot = Bot(self.server, name, aliases, dimension, position, facing)
             self._commit({**self.bots, name: bot})
             return old_bot is None
 
@@ -199,40 +199,42 @@ class BotManager:
             if remove:
                 if key in {bot.name.casefold(), bot.real_name.casefold()}:
                     raise ValueError('登记名和游戏名不能通过删除别名移除')
-                nicknames = [nick for nick in bot.nicknames if nick.casefold() != key]
-                if nicknames == bot.nicknames:
+                aliases = [value for value in bot.aliases if value.casefold() != key]
+                if aliases == bot.aliases:
                     return False
             else:
                 if self._aliases.get(key) is bot:
                     return False
-                nicknames = [*bot.nicknames, alias]
+                aliases = [*bot.aliases, alias]
 
-            replacement = Bot.from_dict(self.server, bot.name, {**bot.to_dict(), 'nicknames': nicknames})
-            aliases, _ = self._indexes({**self.bots, bot.name: replacement})
+            replacement = Bot.from_dict(self.server, bot.name, {**bot.to_dict(), 'aliases': aliases})
+            alias_index, _ = self._indexes({**self.bots, bot.name: replacement})
             data, saved_bots = self._read_bot_data(config)
             saved = saved_bots.get(bot.name)
-            if saved is None or saved.nicknames != bot.nicknames:
+            if saved is None or saved.aliases != bot.aliases:
                 raise RuntimeError(f'磁盘上的假人记录或别名已变更，请先执行 {config.prefix_short} reload')
-            saved.nicknames = replacement.nicknames
+            saved.aliases = replacement.aliases
             self._indexes(saved_bots)
             # Only patch aliases; external coordinates, names and other records stay intact.
-            data[bot.name]['nicknames'] = replacement.nicknames
+            data[bot.name]['aliases'] = replacement.aliases
+            data[bot.name].pop('nicknames', None)
             data[bot.name].pop('nick', None)
             write_json(config.bots_path, data)
 
             # Keep the active Bot and its status version, so waiting actions are not cancelled.
-            bot.nicknames = replacement.nicknames
-            self._aliases = {key: bot if value is replacement else value for key, value in aliases.items()}
+            bot.aliases = replacement.aliases
+            self._aliases = {key: bot if value is replacement else value for key, value in alias_index.items()}
             return True
 
     def get_bot(self, name: str) -> Bot | None:
         with self._lock:
             return self.bots.get(name)
 
-    def get_bot_by_nickname(self, nickname: str, generation: int | None = None) -> Bot | None:
+    def resolve_bot(self, target: str, generation: int | None = None) -> Bot | None:
+        """按登记名、游戏名或别名查找，不区分大小写。"""
         with self._lock:
             self._check_active(generation)
-            return self._aliases.get(nickname.casefold())
+            return self._aliases.get(target.casefold())
 
     def get_bot_by_real_name(self, real_name: str) -> Bot | None:
         """通过假人的真实游戏名（带前后缀）查找 Bot 对象"""

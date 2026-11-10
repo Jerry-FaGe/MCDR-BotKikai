@@ -68,15 +68,15 @@ def test_action_buttons_preserve_commands_and_online_controls(env, bot, online, 
 
 
 @pytest.mark.parametrize('renderer', [view.render_bot_info, view.render_bot_summary])
-def test_panels_hide_identity_aliases_and_preserve_nickname_order(env, renderer):
+def test_panels_hide_identity_aliases_and_preserve_target_order(env, renderer):
     config.bot_name_prefix = 'b_'
     bot = Bot(env.server, 'SandBot',
               ['SANDBOT', 'b_SANDBOT', 'farm', '\u5237\u6c99\u673a'],
               'minecraft:overworld', [1.5, 64, -2.5], [180, 0])
-    nicknames = bot.nicknames.copy()
+    aliases = bot.aliases.copy()
     nodes = _json_nodes(json.loads(renderer(bot).to_json_str()))
     assert any(node.get('text') == 'farm\u3001\u5237\u6c99\u673a' for node in nodes)
-    assert bot.nicknames == nicknames
+    assert bot.aliases == aliases
 
 
 def test_help_reads_current_prefix_and_preserves_templates(env):
@@ -86,7 +86,7 @@ def test_help_reads_current_prefix_and_preserves_templates(env):
     templates = [
         '', ' list [online|offline] [page]',
         ' list [online|offline] search <\u5173\u952e\u8bcd> [page]', ' reload',
-        ' add <name> <kikai>', ' add <name> <kikai> <dim> <pos> <facing>',
+        ' add <name> <alias>', ' add <name> <alias> <dim> <pos> <facing>',
         ' del <kikai>', ' <kikai> alias', ' <kikai> alias add <alias>', ' <kikai> alias del <alias>',
         ' <kikai>', ' <kikai> spawn', ' <kikai> kill',
         ' <kikai> where', ' <kikai> use', ' <kikai> huse [<interval>]',
@@ -159,7 +159,7 @@ def test_rendering_does_not_change_bot_state_or_saved_data(env, bot, online):
     view.render_feedback('done', bot=bot, kind='success')
     view.render_action_feedback(bot, 'where')
     env.source.permission = 0
-    command.bot_action(env.source, {'nickname': 'farm'}, 'info', env.manager)
+    command.bot_action(env.source, {'target': 'farm'}, 'info', env.manager)
 
     assert bot.to_dict() == before
     assert bot.is_online is online
@@ -398,7 +398,7 @@ def test_command_views_use_current_source_permissions(env, bot, monkeypatch, per
     messages = []
     monkeypatch.setattr(env.source, 'reply', messages.append)
 
-    command.bot_action(env.source, {'nickname': 'farm'}, 'info', env.manager)
+    command.bot_action(env.source, {'target': 'farm'}, 'info', env.manager)
     assert messages[-1].to_json_str() == view.render_bot_info(
         bot, can_operate=permission >= operate_level, can_manage=permission >= manage_level).to_json_str()
 

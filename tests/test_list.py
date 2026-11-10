@@ -93,7 +93,7 @@ def test_search_matches_all_identities_and_aliases_with_status_filter(env, statu
 def test_filtering_precedes_pagination_and_each_record_is_returned_once(env):
     bots = _bots(env, 42)
     for bot in bots:
-        bot.nicknames += ['farm', 'farmland']
+        bot.aliases += ['farm', 'farmland']
     message = view.render_bot_list(bots, status='online', query='FARM', page=2)
     assert '\u7b2c 2/3 \u9875' in message.to_plain_text()
     assert '\u5171 21 \u4e2a' in message.to_plain_text()
@@ -106,7 +106,7 @@ def test_order_depends_on_registered_name_not_status_or_alias(env):
     expected = ['!!bk Alpha', '!!bk bravo', '!!bk zBot']
     assert _commands(view.render_bot_list(bots), '[\u8be6\u60c5]') == expected
     bots[0].is_online = True
-    bots[1].nicknames = ['Alpha', 'first']
+    bots[1].aliases = ['Alpha', 'first']
     assert _commands(view.render_bot_list(bots), '[\u8be6\u60c5]') == expected
 
 
@@ -256,7 +256,7 @@ def test_alignment_uses_only_current_page_after_filtering(env, can_operate, opti
             alias = '\u673a' * 8 + str(index)
         else:
             alias = 'WWW'
-        bot.nicknames += [alias, 'match']
+        bot.aliases += [alias, 'match']
     message = view.render_bot_list(bots, can_operate=can_operate, **options)
     rows = [line for line in message.to_plain_text().splitlines()
             if line.startswith(('[\u5728\u7ebf]', '[\u79bb\u7ebf]'))]
@@ -270,7 +270,7 @@ def test_short_machine_names_do_not_reserve_the_seven_character_limit(env, can_o
     names = ['\u56de\u5bb6', '\u7ea2\u77f3\u706f', '\u653b\u51fb', '\u5237\u6c99\u673a', '\u949f']
     bots = _bots(env, len(names))
     for bot, name in zip(bots, names):
-        bot.nicknames += [name]
+        bot.aliases += [name]
     message = view.render_bot_list(bots, can_operate=can_operate)
     rows = [line for line in message.to_plain_text().splitlines()
             if line.startswith(('[\u5728\u7ebf]', '[\u79bb\u7ebf]'))]
@@ -310,9 +310,9 @@ def test_long_query_is_preserved_in_navigation_and_hover(env, bot):
 def test_list_display_name_uses_existing_alias_order(env, aliases, label):
     config.bot_name_prefix = 'b_'
     bot = Bot(env.server, 'SandBot', aliases, 'minecraft:overworld', [0, 64, 0], [0, 0])
-    before = bot.nicknames.copy()
+    before = bot.aliases.copy()
     assert view.render_bot_summary(bot).to_plain_text().startswith(f'[\u79bb\u7ebf] {label} ')
-    assert bot.nicknames == before
+    assert bot.aliases == before
 
 
 @pytest.mark.parametrize('online', [False, True])
